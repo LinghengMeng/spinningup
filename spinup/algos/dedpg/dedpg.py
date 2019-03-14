@@ -190,11 +190,11 @@ def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
 
     def get_action(o, noise_scale):
         feed_dict = {x_ph: o.reshape(1, -1)}
-        a = []
-        for ac_name in ac_ensemble.keys():
-            a.append(sess.run(ac_ensemble[ac_name]['pi'], feed_dict)[0])
+        a = np.zeros([act_dim, len(ac_ensemble)])
+        for ac_i, ac_name in enumerate(ac_ensemble.keys()):
+            a[:, ac_i] = sess.run(ac_ensemble[ac_name]['pi'], feed_dict)[0]
             break # only use one
-        a = np.mean(a)
+        a = np.mean(a, 1)
         a += noise_scale * np.random.randn(act_dim)
         return np.clip(a, -act_limit, act_limit)
 
@@ -323,7 +323,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
 
     # if args.hardcopy_target_nn:
     #     polyak = 0
