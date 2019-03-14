@@ -2,8 +2,8 @@ import numpy as np
 import tensorflow as tf
 import gym
 import time
-from spinup.algos.ddpg_dropout import core
-from spinup.algos.ddpg_dropout.core import get_vars
+from spinup.algos.dedpg import core
+from spinup.algos.dedpg.core import get_vars
 from spinup.utils.logx import EpochLogger
 
 import os
@@ -41,13 +41,14 @@ class ReplayBuffer:
 
 """
 
-Deep Deterministic Policy Gradient (DDPG)
+Deep Ensemble Deterministic Policy Gradient (DEDPG)
 
 """
-def ddpg_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
-         steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, 
-         polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000, 
-         act_noise=0.1, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
+def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
+          ac_kwargs=dict(), seed=0,
+          steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99,
+          polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000,
+          act_noise=0.1, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
 
     Args:
@@ -137,51 +138,63 @@ def ddpg_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
 
     # Main outputs from computation graph
     with tf.variable_scope('main'):
-        pi, q, q_pi = actor_critic(x_ph, a_ph, **ac_kwargs)
+        ac_ensemble = actor_critic_ensemble(x_ph, a_ph, **ac_kwargs)
     
     # Target networks
     with tf.variable_scope('target'):
         # Note that the action placeholder going to actor_critic here is 
         # irrelevant, because we only need q_targ(s, pi_targ(s)).
-        pi_targ, _, q_pi_targ  = actor_critic(x2_ph, a_ph, **ac_kwargs)
+        ac_ensemble_targ = actor_critic_ensemble(x2_ph, a_ph, **ac_kwargs)
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
 
     # Count variables
-    var_counts = tuple(core.count_vars(scope) for scope in ['main/pi', 'main/q', 'main'])
-    print('\nNumber of parameters: \t pi: %d, \t q: %d, \t total: %d\n'%var_counts)
+    for ac_name in ac_ensemble.keys():
+        ac_scope = ['main/{}/pi'.format(ac_name), 'main/{}/q'.format(ac_name), 'main/{}'.format(ac_name)]
+        var_counts = tuple(core.count_vars(scope) for scope in ac_scope)
+        print('\nNumber of parameters of {}: \t pi: {}, \t q: {}, \t total: {}\n'.format(ac_name, *var_counts))
 
-    # Bellman backup for Q function
-    backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*q_pi_targ)
+    # TODO: should backup be a mean of all actor-critics' prediction or treat each actor-critic independently
+    for ac_name in ac_ensemble.keys():
+        # Bellman backup for Q function
+        ac_ensemble[ac_name]['backup'] = tf.stop_gradient(r_ph + gamma * (1 - d_ph) * ac_ensemble_targ[ac_name]['q_pi'])
 
-    # DDPG losses
-    pi_loss = -tf.reduce_mean(q_pi)
-    q_loss = tf.reduce_mean((q-backup)**2)
+    for ac_name in ac_ensemble.keys():
+        # DEDPG losses
+        ac_ensemble[ac_name]['pi_loss'] = -tf.reduce_mean(ac_ensemble[ac_name]['q_pi'])
+        ac_ensemble[ac_name]['q_loss'] = tf.reduce_mean((ac_ensemble[ac_name]['q']-ac_ensemble[ac_name]['backup'])**2)
 
-    # Separate train ops for pi, q
-    pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
-    q_optimizer = tf.train.AdamOptimizer(learning_rate=q_lr)
-    train_pi_op = pi_optimizer.minimize(pi_loss, var_list=get_vars('main/pi'))
-    train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('main/q'))
+        # Separate train ops for pi, q
+        ac_ensemble[ac_name]['pi_optimizer'] = tf.train.AdamOptimizer(learning_rate=pi_lr)
+        ac_ensemble[ac_name]['q_optimizer'] = tf.train.AdamOptimizer(learning_rate=q_lr)
+        ac_ensemble[ac_name]['train_pi_op'] = ac_ensemble[ac_name]['pi_optimizer'].minimize(ac_ensemble[ac_name]['pi_loss'], var_list=get_vars('main/{}/pi'.format(ac_name)))
+        ac_ensemble[ac_name]['train_q_op'] = ac_ensemble[ac_name]['q_optimizer'].minimize(ac_ensemble[ac_name]['q_loss'], var_list=get_vars('main/{}/q'.format(ac_name)))
 
-    # Polyak averaging for target variables
-    target_update = tf.group([tf.assign(v_targ, polyak*v_targ + (1-polyak)*v_main)
-                              for v_main, v_targ in zip(get_vars('main'), get_vars('target'))])
+        # Polyak averaging for target variables
+        ac_ensemble[ac_name]['target_update'] = tf.group([tf.assign(v_targ, polyak*v_targ + (1-polyak)*v_main)
+                                                          for v_main, v_targ in zip(get_vars('main/{}'.format(ac_name)), get_vars('target/{}'.format(ac_name)))])
 
-    # Initializing targets to match main variables
-    target_init = tf.group([tf.assign(v_targ, v_main)
-                              for v_main, v_targ in zip(get_vars('main'), get_vars('target'))])
+        # Initializing targets to match main variables
+        ac_ensemble[ac_name]['target_init'] = tf.group([tf.assign(v_targ, v_main)
+                                                        for v_main, v_targ in zip(get_vars('main/{}'.format(ac_name)), get_vars('target/{}'.format(ac_name)))])
 
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
-    sess.run(target_init)
+    for ac_name in ac_ensemble.keys():
+        sess.run(ac_ensemble[ac_name]['target_init'])
 
     # Setup model saving
-    logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q': q})
+    # TODO:
+    # logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q': q})
 
     def get_action(o, noise_scale):
-        a = sess.run(pi, feed_dict={x_ph: o.reshape(1,-1)})[0]
+        feed_dict = {x_ph: o.reshape(1, -1)}
+        a = []
+        for ac_name in ac_ensemble.keys():
+            a.append(sess.run(ac_ensemble[ac_name]['pi'], feed_dict)[0])
+            break # only use one
+        a = np.mean(a)
         a += noise_scale * np.random.randn(act_dim)
         return np.clip(a, -act_limit, act_limit)
 
@@ -235,6 +248,7 @@ def ddpg_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
             in accordance with tuning done by TD3 paper authors.
             """
             for _ in range(ep_len):
+                # TODO: should each actor-critic be trained with different batchs or the same batch
                 batch = replay_buffer.sample_batch(batch_size)
                 feed_dict = {x_ph: batch['obs1'],
                              x2_ph: batch['obs2'],
@@ -243,13 +257,21 @@ def ddpg_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
                              d_ph: batch['done']
                             }
 
-                # Q-learning update
-                outs = sess.run([q_loss, q, train_q_op], feed_dict)
-                logger.store(LossQ=outs[0], QVals=outs[1])
+                # train actor-critic ensemble
+                for ac_name in ac_ensemble.keys():
+                    # Q-learning update
+                    outs = sess.run([ac_ensemble[ac_name]['q_loss'],
+                                     ac_ensemble[ac_name]['q'],
+                                     ac_ensemble[ac_name]['train_q_op']], feed_dict)
 
-                # Policy update
-                outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
-                logger.store(LossPi=outs[0])
+                    logger.store(LossQ=outs[0], QVals=outs[1])
+
+                    # Policy update
+                    # TODO: delayed policy update?
+                    outs = sess.run([ac_ensemble[ac_name]['pi_loss'],
+                                     ac_ensemble[ac_name]['train_pi_op'],
+                                     ac_ensemble[ac_name]['target_update']], feed_dict)
+                    logger.store(LossPi=outs[0])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -285,9 +307,9 @@ if __name__ == '__main__':
     parser.add_argument('--hid', type=int, default=300)
     parser.add_argument('--l', type=int, default=1)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--epochs', type=int, default=50)
-    parser.add_argument('--exp_name', type=str, default='ddpg')
+    parser.add_argument('--seed', '-s', type=int, default=3)
+    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--exp_name', type=str, default='dedpg')
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
 
     parser.add_argument("--exploration-strategy", type=str, choices=["action_noise", "epsilon_greedy"],
@@ -301,12 +323,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, args.data_dir, datestamp=True)
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
 
-    if args.hardcopy_target_nn:
-        polyak = 0
+    # if args.hardcopy_target_nn:
+    #     polyak = 0
 
-    ddpg_dropout(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
+    dedpg(lambda : gym.make(args.env), actor_critic_ensemble=core.mlp_actor_critic_ensemble,
          ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
          gamma=args.gamma, seed=args.seed, epochs=args.epochs,
          logger_kwargs=logger_kwargs)

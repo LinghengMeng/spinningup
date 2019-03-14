@@ -301,7 +301,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, args.data_dir, datestamp=True)
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
 
     # if args.hardcopy_target_nn:
     #     polyak = 0
