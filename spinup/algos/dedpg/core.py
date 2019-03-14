@@ -35,6 +35,9 @@ def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
         q_pi = tf.squeeze(mlp(tf.concat([x,pi], axis=-1), list(hidden_sizes)+[1], activation, None), axis=1)
     return pi, q, q_pi
 
+"""
+Actor-Critics Ensemble
+"""
 def mlp_actor_critic_ensemble(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
                                output_activation=tf.tanh, action_space=None,
                                AC_names = ['ac_1', 'ac_2', 'ac_3', 'ac_4', 'ac_5']):

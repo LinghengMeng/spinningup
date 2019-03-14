@@ -168,16 +168,20 @@ def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
         # Separate train ops for pi, q
         ac_ensemble[ac_name]['pi_optimizer'] = tf.train.AdamOptimizer(learning_rate=pi_lr)
         ac_ensemble[ac_name]['q_optimizer'] = tf.train.AdamOptimizer(learning_rate=q_lr)
-        ac_ensemble[ac_name]['train_pi_op'] = ac_ensemble[ac_name]['pi_optimizer'].minimize(ac_ensemble[ac_name]['pi_loss'], var_list=get_vars('main/{}/pi'.format(ac_name)))
-        ac_ensemble[ac_name]['train_q_op'] = ac_ensemble[ac_name]['q_optimizer'].minimize(ac_ensemble[ac_name]['q_loss'], var_list=get_vars('main/{}/q'.format(ac_name)))
+        ac_ensemble[ac_name]['train_pi_op'] = ac_ensemble[ac_name]['pi_optimizer'].minimize(ac_ensemble[ac_name]['pi_loss'],
+                                                                                            var_list=get_vars('main/{}/pi'.format(ac_name)))
+        ac_ensemble[ac_name]['train_q_op'] = ac_ensemble[ac_name]['q_optimizer'].minimize(ac_ensemble[ac_name]['q_loss'],
+                                                                                          var_list=get_vars('main/{}/q'.format(ac_name)))
 
         # Polyak averaging for target variables
         ac_ensemble[ac_name]['target_update'] = tf.group([tf.assign(v_targ, polyak*v_targ + (1-polyak)*v_main)
-                                                          for v_main, v_targ in zip(get_vars('main/{}'.format(ac_name)), get_vars('target/{}'.format(ac_name)))])
+                                                          for v_main, v_targ in zip(get_vars('main/{}'.format(ac_name)),
+                                                                                    get_vars('target/{}'.format(ac_name)))])
 
         # Initializing targets to match main variables
         ac_ensemble[ac_name]['target_init'] = tf.group([tf.assign(v_targ, v_main)
-                                                        for v_main, v_targ in zip(get_vars('main/{}'.format(ac_name)), get_vars('target/{}'.format(ac_name)))])
+                                                        for v_main, v_targ in zip(get_vars('main/{}'.format(ac_name)),
+                                                                                  get_vars('target/{}'.format(ac_name)))])
 
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
@@ -190,11 +194,18 @@ def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
 
     def get_action(o, noise_scale):
         feed_dict = {x_ph: o.reshape(1, -1)}
-        a = np.zeros([act_dim, len(ac_ensemble)])
-        for ac_i, ac_name in enumerate(ac_ensemble.keys()):
-            a[:, ac_i] = sess.run(ac_ensemble[ac_name]['pi'], feed_dict)[0]
-            break # only use one
-        a = np.mean(a, 1)
+        take_mean_action = False
+
+        if take_mean_action == True:
+            a = np.zeros([act_dim, len(ac_ensemble)])
+            for ac_i, ac_name in enumerate(ac_ensemble.keys()):
+                a[:, ac_i] = sess.run(ac_ensemble[ac_name]['pi'], feed_dict)[0]
+            a = np.mean(a, axis=1) # mean of actions of ensemble
+        else:
+            for ac_i, ac_name in enumerate(ac_ensemble.keys()):
+                a = sess.run(ac_ensemble[ac_name]['pi'], feed_dict)[0]
+                break
+
         a += noise_scale * np.random.randn(act_dim)
         return np.clip(a, -act_limit, act_limit)
 
@@ -305,7 +316,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
     parser.add_argument('--hid', type=int, default=300)
-    parser.add_argument('--l', type=int, default=1)
+    parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
     parser.add_argument('--epochs', type=int, default=100)
@@ -318,12 +329,11 @@ if __name__ == '__main__':
     parser.add_argument("--epsilon-min", type=float, default=.01, help='minimum of epsilon')
     parser.add_argument("--epsilon-decay", type=float, default=.001, help='epsilon decay')
 
-    parser.add_argument("--data_dir", type=str, default=None)
 
     args = parser.parse_args()
 
     from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
 
     # if args.hardcopy_target_nn:
     #     polyak = 0
