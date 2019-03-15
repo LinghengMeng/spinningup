@@ -1,3 +1,9 @@
+"""
+@auther: linghengmeng@yahoo.com
+
+Inspired by:
+https://github.com/Kyushik/Predictive-Uncertainty-Estimation-using-Deep-Ensemble
+"""
 import numpy as np
 import tensorflow as tf
 import gym
@@ -47,7 +53,9 @@ Deep Ensemble Deterministic Policy Gradient (DEDPG)
 def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
           ac_kwargs=dict(), seed=0,
           steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99,
-          polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000,
+          polyak=0.995, pi_lr=1e-3, q_lr=1e-3,
+          batch_size=100, ensemble_size=1, feed_ac_ensemble_with_same_batch=True,
+          start_steps=10000,
           act_noise=0.1, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
 
@@ -102,6 +110,11 @@ def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
 
         batch_size (int): Minibatch size for SGD.
 
+        ensemble_size (int): the size of ensemble i.e. the number of actor-critic
+
+        feed_ac_ensemble_with_same_batch (bool): indicate if feed each actor-critic in ensemble
+            with the same batch.
+
         start_steps (int): Number of steps for uniform-random action selection,
             before running real policy. Helps exploration.
 
@@ -116,7 +129,6 @@ def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
             the current policy and value function.
 
     """
-
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
 
@@ -138,13 +150,13 @@ def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
 
     # Main outputs from computation graph
     with tf.variable_scope('main'):
-        ac_ensemble = actor_critic_ensemble(x_ph, a_ph, **ac_kwargs)
+        ac_ensemble = actor_critic_ensemble(x_ph, a_ph, **ac_kwargs, ensemble_size=ensemble_size)
     
     # Target networks
     with tf.variable_scope('target'):
         # Note that the action placeholder going to actor_critic here is 
         # irrelevant, because we only need q_targ(s, pi_targ(s)).
-        ac_ensemble_targ = actor_critic_ensemble(x2_ph, a_ph, **ac_kwargs)
+        ac_ensemble_targ = actor_critic_ensemble(x2_ph, a_ph, **ac_kwargs, ensemble_size=ensemble_size)
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
@@ -187,25 +199,18 @@ def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
     sess.run(tf.global_variables_initializer())
     for ac_name in ac_ensemble.keys():
         sess.run(ac_ensemble[ac_name]['target_init'])
-
+    # import pdb; pdb.set_trace()
     # Setup model saving
     # TODO:
     # logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q': q})
 
     def get_action(o, noise_scale):
-        feed_dict = {x_ph: o.reshape(1, -1)}
+        # TODO: Take action according to estimated uncertainty
         take_mean_action = False
-
-        if take_mean_action == True:
-            a = np.zeros([act_dim, len(ac_ensemble)])
-            for ac_i, ac_name in enumerate(ac_ensemble.keys()):
-                a[:, ac_i] = sess.run(ac_ensemble[ac_name]['pi'], feed_dict)[0]
-            a = np.mean(a, axis=1) # mean of actions of ensemble
-        else:
-            for ac_i, ac_name in enumerate(ac_ensemble.keys()):
-                a = sess.run(ac_ensemble[ac_name]['pi'], feed_dict)[0]
-                break
-
+        a = np.zeros([act_dim, len(ac_ensemble)])
+        for ac_i, ac_name in enumerate(ac_ensemble.keys()):
+            a[:, ac_i] = sess.run(ac_ensemble[ac_name]['pi'], feed_dict={x_ph: o.reshape(1, -1)})[0]
+        a = np.mean(a, axis=1)  # mean of actions of ensemble
         a += noise_scale * np.random.randn(act_dim)
         return np.clip(a, -act_limit, act_limit)
 
@@ -255,25 +260,36 @@ def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
 
         if d or (ep_len == max_ep_len):
             """
-            Perform all DDPG updates at the end of the trajectory,
+            Perform all DEDPG updates at the end of the trajectory,
             in accordance with tuning done by TD3 paper authors.
             """
             for _ in range(ep_len):
                 # TODO: should each actor-critic be trained with different batchs or the same batch
-                batch = replay_buffer.sample_batch(batch_size)
-                feed_dict = {x_ph: batch['obs1'],
-                             x2_ph: batch['obs2'],
-                             a_ph: batch['acts'],
-                             r_ph: batch['rews'],
-                             d_ph: batch['done']
-                            }
+                if feed_ac_ensemble_with_same_batch:
+                    batch = replay_buffer.sample_batch(batch_size)
+                    for ac_name in ac_ensemble.keys():
+                        ac_ensemble[ac_name]['feed_dict'] = {x_ph: batch['obs1'],
+                                                             x2_ph: batch['obs2'],
+                                                             a_ph: batch['acts'],
+                                                             r_ph: batch['rews'],
+                                                             d_ph: batch['done']
+                                                             }
+                else:
+                    for ac_name in ac_ensemble.keys():
+                        batch = replay_buffer.sample_batch(batch_size)
+                        ac_ensemble[ac_name]['feed_dict'] = {x_ph: batch['obs1'],
+                                                             x2_ph: batch['obs2'],
+                                                             a_ph: batch['acts'],
+                                                             r_ph: batch['rews'],
+                                                             d_ph: batch['done']
+                                                             }
 
                 # train actor-critic ensemble
                 for ac_name in ac_ensemble.keys():
                     # Q-learning update
                     outs = sess.run([ac_ensemble[ac_name]['q_loss'],
                                      ac_ensemble[ac_name]['q'],
-                                     ac_ensemble[ac_name]['train_q_op']], feed_dict)
+                                     ac_ensemble[ac_name]['train_q_op']], ac_ensemble[ac_name]['feed_dict'])
 
                     logger.store(LossQ=outs[0], QVals=outs[1])
 
@@ -281,7 +297,7 @@ def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
                     # TODO: delayed policy update?
                     outs = sess.run([ac_ensemble[ac_name]['pi_loss'],
                                      ac_ensemble[ac_name]['train_pi_op'],
-                                     ac_ensemble[ac_name]['target_update']], feed_dict)
+                                     ac_ensemble[ac_name]['target_update']], ac_ensemble[ac_name]['feed_dict'])
                     logger.store(LossPi=outs[0])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
@@ -316,11 +332,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
     parser.add_argument('--hid', type=int, default=300)
-    parser.add_argument('--l', type=int, default=2)
+    parser.add_argument('--l', type=int, default=1)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
     parser.add_argument('--epochs', type=int, default=100)
-    parser.add_argument('--exp_name', type=str, default='dedpg')
+    parser.add_argument('--feed_ac_ensemble_with_same_batch', action='store_true')
+    parser.add_argument('--exp_name', type=str, default='dedpg_3ac')
+    parser.add_argument('--ensemble_size', type=int, default=3)
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
 
     parser.add_argument("--exploration-strategy", type=str, choices=["action_noise", "epsilon_greedy"],
@@ -339,6 +357,8 @@ if __name__ == '__main__':
     #     polyak = 0
 
     dedpg(lambda : gym.make(args.env), actor_critic_ensemble=core.mlp_actor_critic_ensemble,
-         ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
-         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-         logger_kwargs=logger_kwargs)
+          ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
+          gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+          ensemble_size = args.ensemble_size,
+          feed_ac_ensemble_with_same_batch=args.feed_ac_ensemble_with_same_batch,
+          logger_kwargs=logger_kwargs)

@@ -39,12 +39,13 @@ def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
 Actor-Critics Ensemble
 """
 def mlp_actor_critic_ensemble(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
-                               output_activation=tf.tanh, action_space=None,
-                               AC_names = ['ac_1', 'ac_2', 'ac_3', 'ac_4', 'ac_5']):
+                              output_activation=tf.tanh, action_space=None,
+                              ensemble_size=1):
     # TODO: acotor-critic in an emsemble could have different structure.
     ac_ensemble = {}
     print('Creating actor-critic ensemble ...')
-    for ac_i, ac_name in enumerate(AC_names):
+    for ac_i in range(ensemble_size):
+        ac_name = 'ac_{}'.format(ac_i+1)
         ac_ensemble[ac_name] = {}
         with tf.variable_scope(ac_name):
             pi, q, q_pi = mlp_actor_critic(x, a, hidden_sizes,
