@@ -2,9 +2,22 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="ace8f787-b0c2-4811-bd68-88a87403fa88" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ddpg/ddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ddpg/ddpg.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/dedpg/core.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/dedpg/core.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/dedpg/dedpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/dedpg/dedpg.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-09-25-dedpg_s3/config.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-09-25-dedpg_s3/progress.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-09-25-dedpg_s3/vars.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-22-43-dedpg_s3/config.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-22-43-dedpg_s3/progress.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-22-43-dedpg_s3/vars.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-44-15-dedpg_s3/config.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-44-15-dedpg_s3/progress.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-51-39-dedpg_s3/config.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-51-39-dedpg_s3/progress.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-51-39-dedpg_s3/vars.pkl" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-14_dedpg_3ac/2019-03-14_22-15-22-dedpg_3ac_s3/config.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/2019-03-14_dedpg_3ac/2019-03-14_22-15-22-dedpg_3ac_s3/progress.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/spinup/algos/td3/td3.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/td3/td3.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -15,22 +28,45 @@
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/spinup/algos/dedpg/dedpg.py">
+        <entry file="file://$PROJECT_DIR$/spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="221">
-              <caret line="13" lean-forward="true" selection-start-line="13" selection-end-line="13" />
+            <state relative-caret-position="701">
+              <caret line="450" column="36" lean-forward="true" selection-start-line="450" selection-start-column="36" selection-end-line="450" selection-end-column="36" />
+              <folding>
+                <element signature="e#0#18#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/spinup/algos/dedpg/core.py">
+        <entry file="file://$PROJECT_DIR$/data/2019-03-18_dropout_0_05_median_and_variance_based_noise/2019-03-18_16-29-44-dropout_0_05_median_and_variance_based_noise_s3/progress.txt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="799">
-              <caret line="47" column="18" selection-start-line="47" selection-start-column="18" selection-end-line="47" selection-end-column="18" />
-              <folding>
-                <element signature="e#0#18#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="663">
+              <caret line="39" column="23" selection-start-line="39" selection-start-column="23" selection-end-line="39" selection-end-column="23" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/data/2019-03-13_ddpg/2019-03-13_00-32-59-ddpg_s3/progress.txt">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="850">
+              <caret line="50" column="4" selection-start-line="50" selection-start-column="4" selection-end-line="50" selection-end-column="4" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/data/td3_one_layer/td3_one_layer_s3/progress.txt">
+          <provider selected="true" editor-type-id="text-editor" />
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/data/td3/td3_s3/progress.txt">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="357">
+              <caret line="21" column="53" selection-start-line="21" selection-start-column="53" selection-end-line="21" selection-end-column="53" />
             </state>
           </provider>
         </entry>
@@ -46,14 +82,17 @@
         <option value="$PROJECT_DIR$/spinup/algos/ddpg/ddpg.py" />
         <option value="$PROJECT_DIR$/spinup/algos/dedpg/core.py" />
         <option value="$PROJECT_DIR$/spinup/algos/dedpg/dedpg.py" />
+        <option value="$PROJECT_DIR$/data/ddpg/ddpg_s0/progress.txt" />
+        <option value="$PROJECT_DIR$/spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py" />
+        <option value="$PROJECT_DIR$/spinup/algos/td3/td3.py" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
     <option name="x" value="-2172" />
     <option name="y" value="-543" />
-    <option name="width" value="3108" />
-    <option name="height" value="1690" />
+    <option name="width" value="2186" />
+    <option name="height" value="3786" />
   </component>
   <component name="ProjectView">
     <navigator proportions="" version="1">
@@ -90,67 +129,72 @@
               <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
               <item name="spinningup" type="462c0819:PsiDirectoryNode" />
               <item name="data" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-13_dedpg" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
-              <item name="spinningup" type="462c0819:PsiDirectoryNode" />
-              <item name="data" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-13_dedpg" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-13_22-57-09-dedpg_s3" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
-              <item name="spinningup" type="462c0819:PsiDirectoryNode" />
-              <item name="data" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_dedpg_2ac" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
-              <item name="spinningup" type="462c0819:PsiDirectoryNode" />
-              <item name="data" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_dedpg_2ac" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_01-10-44-dedpg_2ac_s3" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
-              <item name="spinningup" type="462c0819:PsiDirectoryNode" />
-              <item name="data" type="462c0819:PsiDirectoryNode" />
               <item name="2019-03-14_dedpg_3ac" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
               <item name="spinningup" type="462c0819:PsiDirectoryNode" />
               <item name="data" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_dedpg_3ac" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_02-26-21-dedpg_3ac_s3" type="462c0819:PsiDirectoryNode" />
+              <item name="2019-03-15_vd3_delayed_dropout_main_0_05_critic" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
               <item name="spinningup" type="462c0819:PsiDirectoryNode" />
               <item name="data" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_dedpg_5ac" type="462c0819:PsiDirectoryNode" />
+              <item name="2019-03-15_vd3_delayed_dropout_main_0_05_critic" type="462c0819:PsiDirectoryNode" />
+              <item name="2019-03-15_01-37-19-vd3_delayed_dropout_main_0_05_critic_s3" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
               <item name="spinningup" type="462c0819:PsiDirectoryNode" />
               <item name="data" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_dedpg_5ac" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_02-43-18-dedpg_5ac_s3" type="462c0819:PsiDirectoryNode" />
+              <item name="2019-03-17_vd3_delayed_dropout_main_0_05_critic" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
               <item name="spinningup" type="462c0819:PsiDirectoryNode" />
               <item name="data" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_dedpg_5ac" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_09-54-08-dedpg_5ac_s3" type="462c0819:PsiDirectoryNode" />
+              <item name="2019-03-17_vd3_delayed_dropout_main_0_05_critic" type="462c0819:PsiDirectoryNode" />
+              <item name="2019-03-17_19-54-26-vd3_delayed_dropout_main_0_05_critic_s3" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
               <item name="spinningup" type="462c0819:PsiDirectoryNode" />
               <item name="data" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_dedpg_5ac" type="462c0819:PsiDirectoryNode" />
-              <item name="2019-03-14_11-50-03-dedpg_5ac_s3" type="462c0819:PsiDirectoryNode" />
+              <item name="2019-03-18_dropout_0_05_median_and_variance_based_noise" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
+              <item name="spinningup" type="462c0819:PsiDirectoryNode" />
+              <item name="data" type="462c0819:PsiDirectoryNode" />
+              <item name="2019-03-18_dropout_0_05_median_and_variance_based_noise" type="462c0819:PsiDirectoryNode" />
+              <item name="2019-03-18_16-29-44-dropout_0_05_median_and_variance_based_noise_s3" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
+              <item name="spinningup" type="462c0819:PsiDirectoryNode" />
+              <item name="data" type="462c0819:PsiDirectoryNode" />
+              <item name="td3" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
+              <item name="spinningup" type="462c0819:PsiDirectoryNode" />
+              <item name="data" type="462c0819:PsiDirectoryNode" />
+              <item name="td3" type="462c0819:PsiDirectoryNode" />
+              <item name="td3_s3" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
+              <item name="spinningup" type="462c0819:PsiDirectoryNode" />
+              <item name="data" type="462c0819:PsiDirectoryNode" />
+              <item name="td3_one_layer" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
+              <item name="spinningup" type="462c0819:PsiDirectoryNode" />
+              <item name="data" type="462c0819:PsiDirectoryNode" />
+              <item name="td3_one_layer" type="462c0819:PsiDirectoryNode" />
+              <item name="td3_one_layer_s3" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
@@ -168,7 +212,21 @@
               <item name="spinningup" type="462c0819:PsiDirectoryNode" />
               <item name="spinup" type="462c0819:PsiDirectoryNode" />
               <item name="algos" type="462c0819:PsiDirectoryNode" />
-              <item name="dedpg" type="462c0819:PsiDirectoryNode" />
+              <item name="ddpg" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
+              <item name="spinningup" type="462c0819:PsiDirectoryNode" />
+              <item name="spinup" type="462c0819:PsiDirectoryNode" />
+              <item name="algos" type="462c0819:PsiDirectoryNode" />
+              <item name="td3" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="b2602c69:ProjectViewProjectNode" />
+              <item name="spinningup" type="462c0819:PsiDirectoryNode" />
+              <item name="spinup" type="462c0819:PsiDirectoryNode" />
+              <item name="algos" type="462c0819:PsiDirectoryNode" />
+              <item name="vd3_delayed_dropout" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -177,7 +235,7 @@
     </panes>
   </component>
   <component name="PropertiesComponent">
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../Predictive-Uncertainty-Estimation-using-Deep-Ensemble" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="RunDashboard">
@@ -192,7 +250,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.dedpg">
+  <component name="RunManager" selected="Python.td3">
     <configuration name="ddpg" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="spinningup" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -235,8 +293,52 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="td3" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="spinningup" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/spinup/algos/td3" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/spinup/algos/td3/td3.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="vd3_delayed_dropout" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="spinningup" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/spinup/algos/vd3_delayed_dropout" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.td3" />
+        <item itemvalue="Python.vd3_delayed_dropout" />
         <item itemvalue="Python.dedpg" />
         <item itemvalue="Python.ddpg" />
       </list>
@@ -255,63 +357,43 @@
     </task>
     <servers />
   </component>
+  <component name="TodoView">
+    <todo-panel id="selected-file">
+      <is-autoscroll-to-source value="true" />
+    </todo-panel>
+    <todo-panel id="all">
+      <are-packages-shown value="true" />
+      <is-autoscroll-to-source value="true" />
+    </todo-panel>
+  </component>
   <component name="ToolWindowManager">
     <frame x="-2166" y="-537" width="1093" height="1893" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.256386" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.30463576" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.33579126" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.41803744" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
-      <window_info anchor="bottom" id="TODO" order="6" />
+      <window_info anchor="bottom" id="TODO" order="6" weight="0.3295519" />
       <window_info anchor="bottom" id="Version Control" order="7" />
-      <window_info anchor="bottom" id="Terminal" order="8" weight="0.32841748" />
-      <window_info anchor="bottom" id="Event Log" order="9" side_tool="true" />
-      <window_info anchor="bottom" id="Python Console" order="10" weight="0.3286119" />
+      <window_info active="true" anchor="bottom" id="Terminal" order="8" sideWeight="0.49966952" visible="true" weight="0.5076574" />
+      <window_info anchor="bottom" id="Event Log" order="9" sideWeight="0.50033045" side_tool="true" weight="0.58498585" />
+      <window_info anchor="bottom" id="Python Console" order="10" weight="0.32841748" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
     </layout>
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg/2019-03-14_00-23-52-dedpg_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg/2019-03-14_00-17-42-dedpg_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg/2019-03-14_00-24-11-dedpg_s3/config.json">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="187">
-          <caret line="11" column="24" selection-start-line="11" selection-start-column="24" selection-end-line="11" selection-end-column="24" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/spinup/utils/logx.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-2040" />
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/spinup/utils/run_utils.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-4131">
-          <folding>
-            <element signature="e#0#136#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_3ac/2019-03-14_02-26-21-dedpg_3ac_s3/config.json">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_02-42-41-dedpg_5ac_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_02-42-41-dedpg_5ac_s3/progress.txt" />
     <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg/2019-03-14_00-24-11-dedpg_s3/progress.txt">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="85">
@@ -319,54 +401,21 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg/ddpg.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="726">
-          <caret line="236" column="35" selection-start-line="236" selection-start-column="35" selection-end-line="236" selection-end-column="35" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_11-44-35-dedpg_5ac_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_11-47-46-dedpg_5ac_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_11-44-35-dedpg_5ac_s3/progress.txt" />
+    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_11-47-46-dedpg_5ac_s3/progress.txt" />
     <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_09-54-08-dedpg_5ac_s3/config.json">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
     <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_02-43-18-dedpg_5ac_s3/config.json">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_11-50-03-dedpg_5ac_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
     <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_2ac/2019-03-14_01-10-44-dedpg_2ac_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/data/2019-03-14_ddpg/2019-03-14_10-55-48-ddpg_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/data/2019-03-14_ddpg/2019-03-14_10-55-48-ddpg_s3/config.json">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/data/2019-03-13_ddpg/2019-03-13_00-32-59-ddpg_s3/config.json">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
     <entry file="file://$USER_HOME$/AppData/Local/conda/conda/envs/tf_gpu/Lib/site-packages/matplotlib/legend.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="385">
           <caret line="1195" selection-start-line="1195" selection-end-line="1195" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_09-54-08-dedpg_5ac_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="969">
-          <caret line="57" column="5" selection-start-line="57" selection-start-column="5" selection-end-line="57" selection-end-column="5" />
         </state>
       </provider>
     </entry>
@@ -377,24 +426,101 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/spinup/algos/vd3/vd3.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-4335">
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_02-43-18-dedpg_5ac_s3/progress.txt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="969">
+        <state relative-caret-position="241">
           <caret line="57" column="4" selection-start-line="57" selection-start-column="4" selection-end-line="57" selection-end-column="4" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/data/2019-03-13_ddpg/2019-03-13_00-32-59-ddpg_s3/progress.txt">
+    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_09-54-08-dedpg_5ac_s3/progress.txt">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="969">
-          <caret line="57" column="4" selection-start-line="57" selection-start-column="4" selection-end-line="57" selection-end-column="4" />
+        <state relative-caret-position="241">
+          <caret line="57" column="5" selection-start-line="57" selection-start-column="5" selection-end-line="57" selection-end-column="5" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-14_dedpg_5ac/2019-03-14_11-50-03-dedpg_5ac_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-15_vd3_delayed_dropout_main_0_05_critic/2019-03-15_01-11-32-vd3_delayed_dropout_main_0_05_critic_s3/progress.txt" />
+    <entry file="file://$USER_HOME$/AppData/Local/conda/conda/envs/tf_gpu/Lib/site-packages/pandas/io/parsers.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="246">
+          <caret line="1017" column="36" selection-start-line="1017" selection-start-column="36" selection-end-line="1017" selection-end-column="36" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-17_vd3_delayed_dropout_main_0_05_critic/2019-03-17_19-54-26-vd3_delayed_dropout_main_0_05_critic_s3/config.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="442">
+          <caret line="26" column="13" selection-start-line="26" selection-start-column="13" selection-end-line="26" selection-end-column="13" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-17_vd3_delayed_dropout_main_0_05_critic/2019-03-17_18-42-03-vd3_delayed_dropout_main_0_05_critic_s3/progress.txt" />
+    <entry file="file://$PROJECT_DIR$/data/2019-03-17_vd3_delayed_dropout_main_0_05_critic/2019-03-17_18-41-14-vd3_delayed_dropout_main_0_05_critic_s3/progress.txt" />
+    <entry file="file://$PROJECT_DIR$/data/2019-03-17_vd3_delayed_dropout_main_0_05_critic/2019-03-17_18-43-17-vd3_delayed_dropout_main_0_05_critic_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="323">
+          <caret line="19" column="41" selection-start-line="19" selection-start-column="41" selection-end-line="19" selection-end-column="41" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-15_vd3_delayed_dropout_main_0_05_critic/2019-03-15_01-37-19-vd3_delayed_dropout_main_0_05_critic_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="203">
+          <caret line="78" column="129" selection-start-line="78" selection-start-column="129" selection-end-line="78" selection-end-column="129" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-18_vd3_dropout_0_05_gaussian_sample_add_action_noise/2019-03-18_00-58-44-vd3_dropout_0_05_gaussian_sample_add_action_noise_s3/config.json">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-18_vd3_dropout_0_05_gaussian_sample_add_action_noise/2019-03-18_00-58-44-vd3_dropout_0_05_gaussian_sample_add_action_noise_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="170">
+          <caret line="10" column="29" lean-forward="true" selection-start-line="10" selection-start-column="29" selection-end-line="10" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-17_vd3_delayed_dropout_main_0_05_critic/2019-03-17_19-54-26-vd3_delayed_dropout_main_0_05_critic_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="119">
+          <caret line="7" column="181" selection-start-line="7" selection-start-column="181" selection-end-line="7" selection-end-column="181" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg/ddpg.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="267">
+          <caret line="185" column="48" lean-forward="true" selection-start-line="183" selection-start-column="8" selection-end-line="185" selection-end-column="48" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-18_vd3_dropout_0_05_gaussian_sample/2019-03-18_12-09-58-vd3_dropout_0_05_gaussian_sample_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="68">
+          <caret line="4" column="59" selection-start-line="4" selection-start-column="59" selection-end-line="4" selection-end-column="59" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/spinup/algos/dedpg/core.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="799">
-          <caret line="47" column="18" selection-start-line="47" selection-start-column="18" selection-end-line="47" selection-end-column="18" />
+        <state relative-caret-position="510">
+          <caret line="30" column="60" selection-start-line="30" selection-start-column="60" selection-end-line="30" selection-end-column="60" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
           </folding>
@@ -403,8 +529,140 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/spinup/algos/dedpg/dedpg.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="221">
-          <caret line="13" lean-forward="true" selection-start-line="13" selection-end-line="13" />
+        <state relative-caret-position="358">
+          <caret line="214" column="48" selection-start-line="207" selection-start-column="8" selection-end-line="214" selection-end-column="48" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/spinup/algos/vd3_delayed_dropout/core.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="483">
+          <caret line="114" column="21" selection-start-line="114" selection-start-column="21" selection-end-line="114" selection-end-column="21" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-18_vd3_dropout_0_05_gaussian_sample/2019-03-18_14-37-15-vd3_dropout_0_05_gaussian_sample_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/ddpg/ddpg_s0/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="306">
+          <caret line="18" column="20" selection-start-line="18" selection-start-column="20" selection-end-line="18" selection-end-column="20" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-14_ddpg/2019-03-14_10-55-48-ddpg_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="153">
+          <caret line="9" column="19" selection-start-line="9" selection-start-column="19" selection-end-line="9" selection-end-column="19" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-51-39-dedpg_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-22-43-dedpg_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-09-25-dedpg_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-14_ddpg/2019-03-14_10-55-48-ddpg_s3/config.json">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-18_vd3_dropout_0_05_gaussian_sample/2019-03-18_13-38-13-vd3_dropout_0_05_gaussian_sample_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="323">
+          <caret line="19" column="16" selection-start-line="19" selection-start-column="16" selection-end-line="19" selection-end-column="16" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_20-28-38-dedpg_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="238">
+          <caret line="14" column="49" selection-start-line="14" selection-start-column="49" selection-end-line="14" selection-end-column="49" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-57-09-dedpg_s3/config.json">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-13_dedpg/2019-03-13_22-57-09-dedpg_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-18_vd3_dropout_0_05_gaussian_sample/2019-03-18_12-16-11-vd3_dropout_0_05_gaussian_sample_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="153">
+          <caret line="9" column="111" selection-start-line="9" selection-start-column="111" selection-end-line="9" selection-end-column="111" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-18_vd3_dropout_0_05_mean_and_variance_based_noise/2019-03-18_15-14-51-vd3_dropout_0_05_mean_and_variance_based_noise_s3/config.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="510">
+          <caret line="30" column="6" lean-forward="true" selection-start-line="30" selection-start-column="6" selection-end-line="30" selection-end-column="6" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-13_ddpg/2019-03-13_00-32-59-ddpg_s3/config.json">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/td3/td3_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="357">
+          <caret line="21" column="53" selection-start-line="21" selection-start-column="53" selection-end-line="21" selection-end-column="53" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/td3/td3_s3/config.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-64" />
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/spinup/algos/td3/td3.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="531">
+          <caret line="314" column="55" selection-start-line="314" selection-start-column="55" selection-end-line="314" selection-end-column="55" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/td3_one_layer/td3_one_layer_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-13_ddpg/2019-03-13_00-32-59-ddpg_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="850">
+          <caret line="50" column="4" selection-start-line="50" selection-start-column="4" selection-end-line="50" selection-end-column="4" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-18_vd3_dropout_0_05_mean_and_variance_based_noise/2019-03-18_15-14-51-vd3_dropout_0_05_mean_and_variance_based_noise_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="561">
+          <caret line="33" column="40" selection-start-line="33" selection-start-column="40" selection-end-line="33" selection-end-column="40" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/data/2019-03-18_dropout_0_05_median_and_variance_based_noise/2019-03-18_16-29-44-dropout_0_05_median_and_variance_based_noise_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="663">
+          <caret line="39" column="23" selection-start-line="39" selection-start-column="23" selection-end-line="39" selection-end-column="23" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="701">
+          <caret line="450" column="36" lean-forward="true" selection-start-line="450" selection-start-column="36" selection-end-line="450" selection-end-column="36" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>

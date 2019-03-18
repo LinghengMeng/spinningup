@@ -45,7 +45,11 @@ VD3 (Variational Delayed DDPG)
 def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, 
         polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000,
-        act_noise=0.1, target_noise=0.2, noise_clip=0.5, policy_delay=2, 
+        act_noise=0.1, target_noise=0.2, noise_clip=0.5,
+        n_post_q=1, n_post_action = 10,
+        sample_action_with_dropout = True, dropout_rate=0.1,
+        action_choose_method = 'random_sample', add_action_noise=True,
+        policy_delay=2,
         max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
 
@@ -150,12 +154,12 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
     with tf.variable_scope('main'):
         pi, pi_reg, pi_new_dropout_masks, pi_dropout_mask_phs,\
         q, q_reg, q_new_dropout_masks, q_dropout_mask_phs,\
-        q_pi, q_pi_reg = actor_critic(x_ph, a_ph, **ac_kwargs, dropout_rate=0.05)
+        q_pi, q_pi_reg = actor_critic(x_ph, a_ph, **ac_kwargs, dropout_rate=dropout_rate)
 
     # Target policy network
     with tf.variable_scope('target'):
         pi_targ, _, pi_new_dropout_masks_targ, pi_dropout_mask_phs_targ, \
-        _, _, _, _, _, _ = actor_critic(x2_ph, a_ph, **ac_kwargs, dropout_rate=0.05)
+        _, _, _, _, _, _ = actor_critic(x2_ph, a_ph, **ac_kwargs, dropout_rate=dropout_rate)
 
     # Target Q networks
     with tf.variable_scope('target', reuse=True):
@@ -181,8 +185,8 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
     print('\nNumber of parameters: \t pi: %d, \t q: %d, \t total: %d\n'%var_counts)
 
     # Bellman backup for Q functions, using Clipped Double-Q targets
-    n_post = 1#10
-    q_post_ph = tf.placeholder(dtype=tf.float32, shape=(batch_size,n_post))
+
+    q_post_ph = tf.placeholder(dtype=tf.float32, shape=(batch_size,n_post_q))
 
     q_targ_min = tf.reduce_min(q_post_ph, 1)
     backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*q_targ_min)
@@ -218,12 +222,66 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
     logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q': q})
 
     def get_action(o, noise_scale):
+        a_uncertainty = 0
         feed_dictionary = {x_ph: o.reshape(1, -1)}
-        # Set dropout_mask to 1
+        if sample_action_with_dropout:
+            # Generate post samples
+            a_post = np.zeros((n_post_action, act_dim))
+            for post_i in range(n_post_action):
+                pi_dropout_masks = sess.run(pi_new_dropout_masks)
+                for mask_i in range(len(pi_dropout_mask_phs)):
+                    feed_dictionary[pi_dropout_mask_phs[mask_i]] = pi_dropout_masks[mask_i]
+
+                a_post[post_i] = sess.run(pi, feed_dict=feed_dictionary)[0]
+            # import pdb; pdb.set_trace()
+            a_uncertainty = np.sum(np.var(a_post, axis=0))
+
+            # Choose one action from post samples
+            if action_choose_method == 'random_sample':
+                # Method 1: randomly sample one from post sampled actions
+                a = a_post[np.random.choice(n_post_action)]
+            elif action_choose_method == 'gaussian_sample':
+                # Method 2: estimate mean and variance, then sample from a Gaussian distribution
+                # TODO: variance must been scaled or clipped.
+                #  Otherwise, a huge variance will always cause action out of act_lim and then be clipped to -1 or 1.
+                a_mean = np.mean(a_post, axis=0)
+                a_var = np.var(a_post, axis=0)
+                a_var_clipped = np.clip(a_var, 0, 1)
+                a = np.zeros((act_dim,))
+                for a_i in range(act_dim):
+                    a[i] = np.random.normal(a_mean[a_i], a_var_clipped[a_i], 1)
+            elif action_choose_method == 'mean_of_samples':
+                pass
+            elif action_choose_method == 'median_of_sample':
+                pass
+            elif action_choose_method == 'mean_and_variance_based_noise':
+                a_mean = np.mean(a_post, axis=0)
+                variance = np.var(a_post, axis=0)
+                variance_clipped = np.clip(variance, 0, 1)
+                noise = variance_clipped * np.random.randn(act_dim)
+                a = a_mean+noise
+            elif action_choose_method == 'median_and_variance_based_noise':
+                a_median = np.median(a_post, axis=0)
+                variance = np.var(a_post, axis=0)
+                variance_clipped = np.clip(variance, 0, 1)
+                noise = variance_clipped * np.random.randn(act_dim)
+                a = a_median+noise
+            else:
+                pass
+        else:
+            for mask_i in range(len(pi_dropout_mask_phs)):
+                feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_new_dropout_masks[mask_i].shape.as_list())
+            a = sess.run(pi, feed_dict=feed_dictionary)[0]
+        # TODO: Do we still need action_noise??
+        if add_action_noise:
+            a += noise_scale * np.random.randn(act_dim)
+        return np.clip(a, -act_limit, act_limit), a_uncertainty
+
+    def get_action_test(o):
+        feed_dictionary = {x_ph: o.reshape(1, -1)}
         for mask_i in range(len(pi_dropout_mask_phs)):
             feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_new_dropout_masks[mask_i].shape.as_list())
         a = sess.run(pi, feed_dict=feed_dictionary)[0]
-        a += noise_scale * np.random.randn(act_dim)
         return np.clip(a, -act_limit, act_limit)
 
     def test_agent(n=10):
@@ -231,32 +289,35 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
             o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
             while not(d or (ep_len == max_ep_len)):
                 # Take deterministic actions at test time (noise_scale=0)
-                o, r, d, _ = test_env.step(get_action(o, 0))
+                o, r, d, _ = test_env.step(get_action_test(o))
                 ep_ret += r
                 ep_len += 1
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
     start_time = time.time()
-    o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
+    o, r, d, ep_ret, ep_len, ep_a_uncertainty = env.reset(), 0, False, 0, 0, 0
     total_steps = steps_per_epoch * epochs
 
     # Main loop: collect experience in env and update/log each epoch
     for t in range(total_steps):
-
         """
         Until start_steps have elapsed, randomly sample actions
         from a uniform distribution for better exploration. Afterwards, 
         use the learned policy (with some noise, via act_noise). 
         """
         if t > start_steps:
-            a = get_action(o, act_noise)
+            a, a_uncertainty = get_action(o, act_noise)
         else:
             a = env.action_space.sample()
+            # TODO:
+            a_uncertainty = 0
 
         # Step the env
         o2, r, d, _ = env.step(a)
         ep_ret += r
         ep_len += 1
+        # print('stap: {}, uncertainty: {}'.format(t, a_uncertainty))
+        ep_a_uncertainty += a_uncertainty
 
         # Ignore the "done" signal if it comes from hitting the time
         # horizon (that is, when it's an artificial terminal signal
@@ -286,12 +347,13 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
                              }
 
                 # Delayed dropout_mask update
-                if j % 100 == 0:
-                    pi_dropout_masks = sess.run(pi_new_dropout_masks)
-                    q_dropout_masks = sess.run(q_new_dropout_masks)
-
-                    pi_targ_dropout_masks = sess.run(pi_new_dropout_masks_targ)
-                    q_targ_dropout_masks = sess.run(q_new_dropout_masks_targ)
+                # dropout_delay = 1
+                # if j % dropout_delay == 0:
+                #     pi_dropout_masks = sess.run(pi_new_dropout_masks)
+                #     q_dropout_masks = sess.run(q_new_dropout_masks)
+                #
+                #     pi_targ_dropout_masks = sess.run(pi_new_dropout_masks_targ)
+                #     q_targ_dropout_masks = sess.run(q_new_dropout_masks_targ)
 
                 # Add dropout_mask to feed_dict
                 for mask_i in range(len(pi_dropout_mask_phs)):
@@ -307,8 +369,8 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
                 # import pdb; pdb.set_trace()
 
                 # Run q nn multiple times
-                q_post = np.zeros((batch_size, n_post))
-                for i in range(n_post):
+                q_post = np.zeros((batch_size, n_post_q))
+                for i in range(n_post_q):
                     q_post[:, i] = sess.run(q_targ, feed_dict)
                 #
                 feed_dict[q_post_ph] = q_post
@@ -323,8 +385,8 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
                     outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
                     logger.store(LossPi=outs[0])
 
-            logger.store(EpRet=ep_ret, EpLen=ep_len)
-            o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
+            logger.store(EpRet=ep_ret, EpLen=ep_len,EpUncertainty=ep_a_uncertainty)
+            o, r, d, ep_ret, ep_len, ep_a_uncertainty = env.reset(), 0, False, 0, 0, 0
 
         # End of epoch wrap-up
         if t > 0 and t % steps_per_epoch == 0:
@@ -340,6 +402,7 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
             # Log info about epoch
             logger.log_tabular('Epoch', epoch)
             logger.log_tabular('EpRet', with_min_and_max=True)
+            logger.log_tabular('EpUncertainty', with_min_and_max=True)
             logger.log_tabular('TestEpRet', with_min_and_max=True)
             logger.log_tabular('EpLen', average_only=True)
             logger.log_tabular('TestEpLen', average_only=True)
@@ -355,12 +418,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
     parser.add_argument('--hid', type=int, default=300)
-    parser.add_argument('--l', type=int, default=3)
+    parser.add_argument('--l', type=int, default=1)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
     parser.add_argument('--epochs', type=int, default=100)
-    parser.add_argument('--exp_name', type=str, default='vd3_delayed_dropout_main_0_05_critic')
+    parser.add_argument('--exp_name', type=str, default='vd3_delayed_dropout_0_05')
     parser.add_argument('--batch_size', type=float, default=100)
+    parser.add_argument('--sample_action_with_dropout', action='store_true')
+    parser.add_argument('--dropout_rate', type=float, default=0.1)
+    parser.add_argument('--action_choose_method', choices=['random_sample',
+                                                           'gaussian_sample',
+                                                           'mean_and_variance_based_noise',
+                                                           'median_and_variance_based_noise'],
+                        default='gaussian_sample')
+    parser.add_argument('--add_action_noise', action='store_true')
     # parser.add_argument('--hardcopy_targ', type=str, default='True')
     args = parser.parse_args()
 
@@ -368,9 +439,13 @@ if __name__ == '__main__':
     #     polyak = 0
 
     from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
     
     vd3_delayed_dropout(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
         gamma=args.gamma, batch_size=args.batch_size, seed=args.seed, epochs=args.epochs,
+        sample_action_with_dropout=args.sample_action_with_dropout,
+        dropout_rate=args.dropout_rate,
+        action_choose_method=args.action_choose_method,
+        add_action_noise=args.add_action_noise,
         logger_kwargs=logger_kwargs)
