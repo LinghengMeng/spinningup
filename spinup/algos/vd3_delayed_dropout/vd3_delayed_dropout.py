@@ -418,11 +418,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
     parser.add_argument('--hid', type=int, default=300)
-    parser.add_argument('--l', type=int, default=1)
+    parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
     parser.add_argument('--epochs', type=int, default=100)
-    parser.add_argument('--exp_name', type=str, default='vd3_delayed_dropout_0_05')
+    parser.add_argument('--exp_name', type=str, default='vd3_2layers_dropout_0_1')
     parser.add_argument('--batch_size', type=float, default=100)
     parser.add_argument('--sample_action_with_dropout', action='store_true')
     parser.add_argument('--dropout_rate', type=float, default=0.1)
@@ -449,3 +449,6 @@ if __name__ == '__main__':
         action_choose_method=args.action_choose_method,
         add_action_noise=args.add_action_noise,
         logger_kwargs=logger_kwargs)
+
+# python spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py --env HalfCheetah-v2 --seed 3 --l 2 --sample_action_with_dropout --dropout_rate 0.1 --action_choose_method median_and_variance_based_noise --exp_name vd3_two_layers_dropout_0_1_median_and_variance_based_noise
+# python spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py --env Ant-v2 --seed 3 --l 2 --sample_action_with_dropout --dropout_rate 0.1 --action_choose_method median_and_variance_based_noise --exp_name vd3_Ant_v2_two_layers_dropout_0_1_median_and_variance_based_noise
