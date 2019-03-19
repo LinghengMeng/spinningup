@@ -1,0 +1,46 @@
+{
+    "ac_kwargs":	{
+        "hidden_sizes":	[
+            300,
+            300
+        ]
+    },
+    "act_noise":	0.1,
+    "actor_critic":	"mlp_actor_critic",
+    "batch_size":	100,
+    "env_fn":	"<function <lambda> at 0x7f59f7eaa1e0>",
+    "epochs":	100,
+    "exp_name":	"td3_Ant_v2_two_layers",
+    "gamma":	0.99,
+    "logger":	{
+        "<spinup.utils.logx.EpochLogger object at 0x7f59f7f54a90>":	{
+            "epoch_dict":	{},
+            "exp_name":	"td3_Ant_v2_two_layers",
+            "first_row":	true,
+            "log_current_row":	{},
+            "log_headers":	[],
+            "output_dir":	"/home/lingheng/Documents/git_repos/spinningup/data/td3_Ant_v2_two_layers/td3_Ant_v2_two_layers_s3",
+            "output_file":	{
+                "<_io.TextIOWrapper name='/home/lingheng/Documents/git_repos/spinningup/data/td3_Ant_v2_two_layers/td3_Ant_v2_two_layers_s3/progress.txt' mode='w' encoding='UTF-8'>":	{
+                    "mode":	"w"
+                }
+            }
+        }
+    },
+    "logger_kwargs":	{
+        "exp_name":	"td3_Ant_v2_two_layers",
+        "output_dir":	"/home/lingheng/Documents/git_repos/spinningup/data/td3_Ant_v2_two_layers/td3_Ant_v2_two_layers_s3"
+    },
+    "max_ep_len":	1000,
+    "noise_clip":	0.5,
+    "pi_lr":	0.001,
+    "policy_delay":	2,
+    "polyak":	0.995,
+    "q_lr":	0.001,
+    "replay_size":	1000000,
+    "save_freq":	1,
+    "seed":	3,
+    "start_steps":	10000,
+    "steps_per_epoch":	5000,
+    "target_noise":	0.2
+}
