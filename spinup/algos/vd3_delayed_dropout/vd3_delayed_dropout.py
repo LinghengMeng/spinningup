@@ -296,7 +296,7 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
                 #  Otherwise, a huge variance will always cause action out of act_lim and then be clipped to -1 or 1.
                 a_mean = np.mean(a_post, axis=0)
                 a_var = np.var(a_post, axis=0)
-                a_var_clipped = np.clip(a_var, 0, 1)
+                a_var_clipped = np.clip(a_var, a_var_clip_min, a_var_clip_max)
                 a = np.zeros((act_dim,))
                 for a_i in range(act_dim):
                     a[i] = np.random.normal(a_mean[a_i], a_var_clipped[a_i], 1)
@@ -489,6 +489,7 @@ if __name__ == '__main__':
     parser.add_argument('--exp_name', type=str, default='vd3_2layers_dropout_0_1')
     parser.add_argument('--batch_size', type=float, default=100)
 
+    parser.add_argument('--n_post_action', type=int, default=10)
     parser.add_argument('--sample_action_with_dropout', action='store_true')
     parser.add_argument('--dropout_rate', type=float, default=0.1)
     parser.add_argument('--action_choose_method', choices=['random_sample',
@@ -497,8 +498,8 @@ if __name__ == '__main__':
                                                            'median_and_variance_based_noise',
                                                            'prediction_and_variance_based_noise'],
                         default='gaussian_sample')
-    parser.add_argument('--a_var_clip_max', type=float, default=0.5)
-    parser.add_argument('--a_var_clip_min', type=float, default=0.05)
+    parser.add_argument('--a_var_clip_max', type=float, default=1)
+    parser.add_argument('--a_var_clip_min', type=float, default=0.1)
 
     parser.add_argument('--target_policy_smooth', action='store_true')
     parser.add_argument('--act_noise', type=float, default=0.1)
@@ -514,6 +515,7 @@ if __name__ == '__main__':
     vd3_delayed_dropout(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
         gamma=args.gamma, batch_size=args.batch_size, seed=args.seed, epochs=args.epochs,
+        n_post_action = args.n_post_action,
         sample_action_with_dropout=args.sample_action_with_dropout,
         dropout_rate=args.dropout_rate,
         action_choose_method=args.action_choose_method,
@@ -538,3 +540,5 @@ if __name__ == '__main__':
 
 # python spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py --env HalfCheetah-v2 --seed 3 --l 2 --act_noise 0.2 --exp_name vd3_two_layers_withoutdropout_0_2_act_noise_no_target_policy_smooth
 # python spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py --env HalfCheetah-v2 --seed 3 --l 2 --act_noise 0.3 --exp_name vd3_two_layers_withoutdropout_0_3_act_noise_no_target_policy_smooth
+
+# python spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py --env HalfCheetah-v2 --seed 3 --l 2 --sample_action_with_dropout --dropout_rate 0.1 --action_choose_method median_and_variance_based_noise --a_var_clip_max 0.5 --a_var_clip_min 0.05 --exp_name vd3_two_layers_dropout_0_1_median_no_target_policy_smooth_05_5_varclip
