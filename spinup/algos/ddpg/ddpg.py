@@ -316,3 +316,4 @@ if __name__ == '__main__':
 
 # python  spinup/algos/ddpg/ddpg.py --env HalfCheetah-v2 --seed 3 --l 2 --exp_name ddpg_two_layers_delay_policy
 # python  spinup/algos/ddpg/ddpg.py --env Ant-v2 --seed 3 --l 2 --exp_name ddpg_Ant_v2_two_layers_delay_policy
+# python  spinup/algos/ddpg/ddpg.py --env Humanoid-v2 --seed 3 --l 2 --exp_name ddpg_Humanoid_v2_two_layers_delay_policy

@@ -43,9 +43,23 @@ class VariationalDense:
 def generate_dropout_mask_placeholders(x_dim, hidden_sizes=(32,)):
     dropout_mask_placeholders = []
     for l, size in enumerate((x_dim, *hidden_sizes)):
-        dropout_mask_placeholders.append(tf.placeholder(dtype=tf.float32, name='dropout_mask_{}'.format(l)))
+        dropout_mask_placeholders.append(tf.placeholder(dtype=tf.float32, shape=(size,),
+                                                        name='dropout_mask_{}'.format(l)))
     return dropout_mask_placeholders
 
+class DropoutMaskGenerator:
+    """Class used to generate dropout mask."""
+    def __init__(self,x_dim, hidden_sizes=(32,), model_prob=0.9):
+        self.x_dim = x_dim
+        self.hidden_sizes = hidden_sizes
+        self.model_prob = model_prob
+    def generate_dropout_mask(self):
+        new_dropout_masks = []
+        for l, size in enumerate((self.x_dim, *self.hidden_sizes)):
+            new_dropout_masks.append(np.random.binomial(1, self.model_prob, (size,)))
+        return new_dropout_masks
+
+# delete
 def update_dropout_masks(x_dim, hidden_sizes=(32,), model_prob=0.9):
     model_bern = Bernoulli(probs=model_prob, dtype=tf.float32)
     new_dropout_masks = []
@@ -133,6 +147,7 @@ def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
         with tf.variable_scope('pi'):
             pi_in_dim = x.shape.as_list()[1]
             pi_new_dropout_masks = update_dropout_masks(pi_in_dim, hidden_sizes, model_prob=1.0 - dropout_rate)
+            pi_dropout_mask_generator = DropoutMaskGenerator(pi_in_dim, hidden_sizes, model_prob=1.0 - dropout_rate)
             pi_dropout_mask_phs = generate_dropout_mask_placeholders(pi_in_dim, hidden_sizes)
 
             pi, pi_reg = mlp_variational(x, pi_dropout_mask_phs, list(hidden_sizes) + [act_dim], activation, output_activation, dropout_rate)
@@ -141,6 +156,7 @@ def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
             q_in_ph = tf.concat([x, a], axis=-1)
             q_in_dim = q_in_ph.shape.as_list()[1]
             q_new_dropout_masks = update_dropout_masks(q_in_dim, hidden_sizes, model_prob=1.0 - dropout_rate)
+            q_dropout_mask_generator = DropoutMaskGenerator(q_in_dim, hidden_sizes, model_prob=1.0 - dropout_rate)
             q_dropout_mask_phs = generate_dropout_mask_placeholders(q_in_dim, hidden_sizes)
 
             q, q_reg = mlp_variational(q_in_ph, q_dropout_mask_phs, list(hidden_sizes) + [1],
@@ -151,5 +167,5 @@ def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
     else:
         raise ValueError('Please choose a proper nn_type!')
 
-    return pi, pi_reg, pi_new_dropout_masks, pi_dropout_mask_phs,\
-           q, q_reg, q_new_dropout_masks, q_dropout_mask_phs, q_pi, q_pi_reg
+    return pi, pi_reg, pi_dropout_mask_generator, pi_dropout_mask_phs,\
+           q, q_reg, q_dropout_mask_generator, q_dropout_mask_phs, q_pi, q_pi_reg
