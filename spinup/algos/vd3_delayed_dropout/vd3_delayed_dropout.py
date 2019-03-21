@@ -50,7 +50,9 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
         n_post_q=1, n_post_action = 10,
         sample_action_with_dropout = True, dropout_rate=0.1,
         action_choose_method = 'random_sample',
-        a_var_clip_max = 0.5, a_var_clip_min = 0.05,
+        uncertainty_noise_type = 'std_noise',
+        a_var_clip_max = 1, a_var_clip_min = 0.1,
+        a_std_clip_max = 1, a_std_clip_min = 0.1,
         policy_delay=2,target_policy_smooth = False,
         max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
@@ -273,7 +275,11 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
             # pdb.set_trace()
             # a_post = np.zeros((n_post_action, act_dim))
             # p_i, a_post= tf.while_loop(condition, body, (0, a_post))
+            # TODO: use tf.graph_util.extract_sub_graph estract sub_graph for pi, then
+            #   run extracted sub_graphs in parallel.
 
+
+            # Non-parallel post sample
             a_post = np.zeros((n_post_action, act_dim))
             for post_i in range(n_post_action):
                 # import pdb; pdb.set_trace()
@@ -283,50 +289,55 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
 
                 a_post[post_i] = sess.run(pi, feed_dict=feed_dictionary)[0]
 
-            a_uncertainty = np.sum(np.var(a_post, axis=0))
-            a_uncertainty_clipped = np.sum(np.clip(np.var(a_post, axis=0), a_var_clip_min, a_var_clip_max))
 
+            # TODO: replace var with std might be better
             # Choose one action from post samples
+            # TODO: var and std must been scaled or clipped.
+            #  Otherwise, a huge variance will always cause action out of act_lim and then be clipped to -1 or 1.
+            #  we also need to set a lower bound to enforce a minimum exploration
+            a_mean = np.mean(a_post, axis=0)
+            a_median = np.median(a_post, axis=0)
+
+            a_var = np.var(a_post, axis=0)
+            a_var_clipped = np.clip(a_var, a_var_clip_min, a_var_clip_max)
+            a_var_noise = a_var_clipped * np.random.randn(act_dim)
+
+            a_std = np.std(a_post, axis=0)
+            a_std_clipped = np.clip(a_std, a_std_clip_min, a_std_clip_max)
+            a_std_noise = a_std_clipped * np.random.randn(act_dim)
+
+            a_var_uncertainty = np.sum(a_var)
+            a_var_uncertainty_clipped = np.sum(a_var_clipped)
+            a_std_uncertainty = np.sum(a_std)
+            a_std_uncertainty_clipped = np.sum(a_std_clipped)
+
+            # TODO: clip noise within a range. Maybe not necessary.
+            if uncertainty_noise_type == 'var_noise':
+                noise = a_var_noise
+            elif uncertainty_noise_type == 'std_noise':
+                noise = a_std_noise
+            else:
+                raise ValueError('Please choose a proper noise_type.')
+            a = np.zeros((act_dim,))
             if action_choose_method == 'random_sample':
                 # Method 1: randomly sample one from post sampled actions
                 a = a_post[np.random.choice(n_post_action)]
             elif action_choose_method == 'gaussian_sample':
-                # Method 2: estimate mean and variance, then sample from a Gaussian distribution
-                # TODO: variance must been scaled or clipped.
-                #  Otherwise, a huge variance will always cause action out of act_lim and then be clipped to -1 or 1.
-                a_mean = np.mean(a_post, axis=0)
-                a_var = np.var(a_post, axis=0)
-                a_var_clipped = np.clip(a_var, a_var_clip_min, a_var_clip_max)
-                a = np.zeros((act_dim,))
+                # Method 2: estimate mean and std, then sample from a Gaussian distribution
                 for a_i in range(act_dim):
-                    a[i] = np.random.normal(a_mean[a_i], a_var_clipped[a_i], 1)
+                    a[i] = np.random.normal(a_mean[a_i], a_std_clipped[a_i], 1)
             elif action_choose_method == 'mean_of_samples':
-                pass
+                a = a_mean
             elif action_choose_method == 'median_of_sample':
                 pass
             elif action_choose_method == 'mean_and_variance_based_noise':
-                a_mean = np.mean(a_post, axis=0)
-                variance = np.var(a_post, axis=0)
-                variance_clipped = np.clip(variance, a_var_clip_min, a_var_clip_max)
-                noise = variance_clipped * np.random.randn(act_dim)
                 a = a_mean+noise
             elif action_choose_method == 'median_and_variance_based_noise':
-                a_median = np.median(a_post, axis=0)
-                variance = np.var(a_post, axis=0)
-                # TODO: we also need to set a lower bound to enforce a minimum exploration
-                variance_clipped = np.clip(variance, a_var_clip_min, a_var_clip_max)
-                noise = variance_clipped * np.random.randn(act_dim)
                 a = a_median+noise
-                # import pdb; pdb.set_trace()
             elif action_choose_method == 'prediction_and_variance_based_noise':
                 for mask_i in range(len(pi_dropout_mask_phs)):
                     feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_dropout_mask_phs[mask_i].shape.as_list())
                 a_prediction = sess.run(pi, feed_dict=feed_dictionary)[0]
-                variance = np.var(a_post, axis=0)
-                # TODO: we also need to set a lower bound to enforce a minimum exploration
-                #   Set this value to a smaller value.
-                variance_clipped = np.clip(variance, a_var_clip_min, a_var_clip_max)
-                noise = variance_clipped * np.random.randn(act_dim)
                 a = a_prediction + noise
             else:
                 pass
@@ -335,7 +346,8 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
                 feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_dropout_mask_phs[mask_i].shape.as_list())
             a = sess.run(pi, feed_dict=feed_dictionary)[0]
             a += noise_scale * np.random.randn(act_dim)
-        return np.clip(a, -act_limit, act_limit), a_uncertainty, a_uncertainty_clipped
+        return np.clip(a, -act_limit, act_limit), \
+               a_var_uncertainty, a_var_uncertainty_clipped, a_std_uncertainty, a_std_uncertainty_clipped
 
     def get_action_test(o):
         """Get deterministic action without noise and dropout."""
@@ -356,7 +368,9 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
     start_time = time.time()
-    o, r, d, ep_ret, ep_len, ep_a_uncertainty,ep_a_uncertainty_clipped = env.reset(), 0, False, 0, 0, 0, 0
+    o, r, d, ep_ret, ep_len, \
+    ep_a_var_uncertainty,ep_a_var_uncertainty_clipped, \
+    ep_a_std_uncertainty, ep_a_std_uncertainty_clipped = env.reset(), 0, False, 0, 0, 0, 0, 0, 0
     total_steps = steps_per_epoch * epochs
 
     # Main loop: collect experience in env and update/log each epoch
@@ -367,19 +381,24 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
         use the learned policy (with some noise, via act_noise). 
         """
         if t > start_steps:
-            a, a_uncertainty,a_uncertainty_clipped = get_action(o, act_noise)
+            a, a_var_uncertainty, a_var_uncertainty_clipped, \
+            a_std_uncertainty, a_std_uncertainty_clipped = get_action(o, act_noise)
         else:
             a = env.action_space.sample()
             # TODO:
-            a_uncertainty = 0
-            a_uncertainty_clipped = 0
+            a_var_uncertainty = 0
+            a_var_uncertainty_clipped = 0
+            a_std_uncertainty = 0
+            a_std_uncertainty_clipped = 0
 
         # Step the env
         o2, r, d, _ = env.step(a)
         ep_ret += r
         ep_len += 1
-        ep_a_uncertainty += a_uncertainty
-        ep_a_uncertainty_clipped += a_uncertainty_clipped
+        ep_a_var_uncertainty += a_var_uncertainty
+        ep_a_var_uncertainty_clipped += a_var_uncertainty_clipped
+        ep_a_std_uncertainty += a_std_uncertainty
+        ep_a_std_uncertainty_clipped += a_std_uncertainty_clipped
 
         # Ignore the "done" signal if it comes from hitting the time
         # horizon (that is, when it's an artificial terminal signal
@@ -428,9 +447,8 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
                 for mask_i in range(len(q_dropout_mask_phs_targ)):
                     feed_dict[q_dropout_mask_phs_targ[mask_i]] = np.ones(q_dropout_mask_phs_targ[mask_i].shape.as_list())#q_dropout_masks[mask_i] #q_targ_dropout_masks[mask_i_q_targ]
 
-
-
-                # Run q nn multiple times
+                # TODO: estimate uncertainty of q-value.
+                #   Run q nn multiple times
                 q_post = np.zeros((batch_size, n_post_q))
                 for i in range(n_post_q):
                     q_post[:, i] = sess.run(q_targ, feed_dict)
@@ -448,8 +466,13 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
                     logger.store(LossPi=outs[0])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len,
-                         EpUncertainty=ep_a_uncertainty, EpUncertaintyClipped=ep_a_uncertainty_clipped)
-            o, r, d, ep_ret, ep_len, ep_a_uncertainty,ep_a_uncertainty_clipped = env.reset(), 0, False, 0, 0, 0, 0
+                         EpVarUncertainty=ep_a_var_uncertainty,
+                         EpVarUncertaintyClipped=ep_a_var_uncertainty_clipped,
+                         EpStdUncertainty=ep_a_std_uncertainty,
+                         EpStdUncertaintyClipped=ep_a_std_uncertainty_clipped)
+            o, r, d, ep_ret, ep_len, \
+            ep_a_var_uncertainty, ep_a_var_uncertainty_clipped, \
+            ep_a_std_uncertainty, ep_a_std_uncertainty_clipped = env.reset(), 0, False, 0, 0, 0, 0, 0, 0
 
         # End of epoch wrap-up
         if t > 0 and t % steps_per_epoch == 0:
@@ -472,8 +495,10 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
             logger.log_tabular('QVals', with_min_and_max=True)
             logger.log_tabular('LossPi', average_only=True)
             logger.log_tabular('LossQ', average_only=True)
-            logger.log_tabular('EpUncertainty', with_min_and_max=True)
-            logger.log_tabular('EpUncertaintyClipped', with_min_and_max=True)
+            logger.log_tabular('EpVarUncertainty', with_min_and_max=True)
+            logger.log_tabular('EpVarUncertaintyClipped', with_min_and_max=True)
+            logger.log_tabular('EpStdUncertainty', with_min_and_max=True)
+            logger.log_tabular('EpStdUncertaintyClipped', with_min_and_max=True)
             logger.log_tabular('Time', time.time()-start_time)
             logger.dump_tabular()
 
@@ -498,8 +523,12 @@ if __name__ == '__main__':
                                                            'median_and_variance_based_noise',
                                                            'prediction_and_variance_based_noise'],
                         default='gaussian_sample')
-    parser.add_argument('--a_var_clip_max', type=float, default=1)
+    parser.add_argument('--uncertainty_noise_type', type=str, choices=['var_noise', 'std_noise'],
+                        default='var_noise')
+    parser.add_argument('--a_var_clip_max', type=float, default=1.0)
     parser.add_argument('--a_var_clip_min', type=float, default=0.1)
+    parser.add_argument('--a_std_clip_max', type=float, default=1.0)
+    parser.add_argument('--a_std_clip_min', type=float, default=0.1)
 
     parser.add_argument('--target_policy_smooth', action='store_true')
     parser.add_argument('--act_noise', type=float, default=0.1)
@@ -519,7 +548,9 @@ if __name__ == '__main__':
         sample_action_with_dropout=args.sample_action_with_dropout,
         dropout_rate=args.dropout_rate,
         action_choose_method=args.action_choose_method,
+        uncertainty_noise_type=args.uncertainty_noise_type,
         a_var_clip_max=args.a_var_clip_max, a_var_clip_min=args.a_var_clip_min,
+        a_std_clip_max=args.a_std_clip_max, a_std_clip_min=args.a_std_clip_min,
         target_policy_smooth=args.target_policy_smooth,
         act_noise = args.act_noise,
         logger_kwargs=logger_kwargs)
@@ -542,3 +573,5 @@ if __name__ == '__main__':
 # python spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py --env HalfCheetah-v2 --seed 3 --l 2 --act_noise 0.3 --exp_name vd3_two_layers_withoutdropout_0_3_act_noise_no_target_policy_smooth
 
 # python spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py --env HalfCheetah-v2 --seed 3 --l 2 --sample_action_with_dropout --dropout_rate 0.1 --action_choose_method median_and_variance_based_noise --a_var_clip_max 0.5 --a_var_clip_min 0.05 --exp_name vd3_two_layers_dropout_0_1_median_no_target_policy_smooth_05_5_varclip
+
+# python spinup/algos/vd3_delayed_dropout/vd3_delayed_dropout.py --env HalfCheetah-v2 --seed 3 --l 2 --sample_action_with_dropout --dropout_rate 0.1 --action_choose_method median_and_variance_based_noise --exp_name vd3_two_layers_dropout_0_1_median_no_target_policy_smooth_std_noise
