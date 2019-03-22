@@ -6,6 +6,7 @@ from spinup.algos.vd3_delayed_dropout import core
 from spinup.algos.vd3_delayed_dropout.core import get_vars
 from spinup.utils.logx import EpochLogger
 from multiprocessing import Pool
+import ray
 
 
 class ReplayBuffer:
@@ -225,8 +226,11 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
     logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q': q})
 
     def get_action(o, noise_scale):
-        a_uncertainty = 0
-        a_uncertainty_clipped = 0
+        a_var_uncertainty = 0
+        a_var_uncertainty_clipped = 0
+        a_std_uncertainty = 0
+        a_std_uncertainty_clipped = 0
+
         feed_dictionary = {x_ph: o.reshape(1, -1)}
         if sample_action_with_dropout:
             # Generate post samples
@@ -278,7 +282,12 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
             # TODO: use tf.graph_util.extract_sub_graph estract sub_graph for pi, then
             #   run extracted sub_graphs in parallel.
 
-
+            @ray.remote
+            class PostSampler(object):
+                def __init__(self, pi_dropout_mask_generator, pi_dropout_mask_phs,):
+                    self.sess = tf.Session()
+                    self.pi
+            
             # Non-parallel post sample
             a_post = np.zeros((n_post_action, act_dim))
             for post_i in range(n_post_action):
@@ -305,11 +314,11 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
             a_std = np.std(a_post, axis=0)
             a_std_clipped = np.clip(a_std, a_std_clip_min, a_std_clip_max)
             a_std_noise = a_std_clipped * np.random.randn(act_dim)
-
-            a_var_uncertainty = np.sum(a_var)
-            a_var_uncertainty_clipped = np.sum(a_var_clipped)
-            a_std_uncertainty = np.sum(a_std)
-            a_std_uncertainty_clipped = np.sum(a_std_clipped)
+            # TODO: define uncertainty to a value that is not affect by action dimension.
+            a_var_uncertainty = np.mean(a_var)#np.sum(a_var)
+            a_var_uncertainty_clipped = np.mean(a_var_clipped) #np.sum(a_var_clipped)
+            a_std_uncertainty = np.mean(a_std) #np.sum(a_std)
+            a_std_uncertainty_clipped = np.mean(a_std_clipped) #np.sum(a_std_clipped)
 
             # TODO: clip noise within a range. Maybe not necessary.
             if uncertainty_noise_type == 'var_noise':
