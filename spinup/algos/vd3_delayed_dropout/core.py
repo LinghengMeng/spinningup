@@ -29,8 +29,6 @@ class VariationalDense:
 
     def __call__(self, X):
         output = self.activation(tf.matmul(X, self.model_W) + self.model_m)
-        if self.model_M.shape[1] == 1:
-            output = tf.squeeze(output)
         return output
 
     @property
@@ -74,7 +72,6 @@ def placeholders(*args):
 
 def mlp_variational(x, dropout_mask_phs, hidden_sizes=(32,),
                     activation=tf.tanh, output_activation=None, dropout_rate=0.1):
-
     # Hidden layers
     regularization = 0
     for l, h in enumerate(hidden_sizes[:-1]):
@@ -160,9 +157,11 @@ def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
 
             q, q_reg = mlp_variational(q_in_ph, q_dropout_mask_phs, list(hidden_sizes) + [1],
                                    activation, None, dropout_rate)
+            q = tf.squeeze(q, axis=1)
         with tf.variable_scope('q', reuse=True):
             q_pi, q_pi_reg = mlp_variational(tf.concat([x, pi], axis=-1), q_dropout_mask_phs, list(hidden_sizes) + [1],
                                       activation, None, dropout_rate)
+            q_pi = tf.squeeze(q_pi, axis=1)
     else:
         raise ValueError('Please choose a proper nn_type!')
 
