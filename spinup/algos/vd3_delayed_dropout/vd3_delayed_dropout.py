@@ -6,8 +6,6 @@ from spinup.algos.vd3_delayed_dropout import core
 from spinup.algos.vd3_delayed_dropout.core import get_vars
 from spinup.utils.logx import EpochLogger
 from multiprocessing import Pool
-import ray
-
 
 class ReplayBuffer:
     """
@@ -209,7 +207,6 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
     train_pi_op = pi_optimizer.minimize(pi_loss, var_list=get_vars('main/pi'))
     train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('main/q'))
 
-
     # Polyak averaging for target variables
     target_update = tf.group([tf.assign(v_targ, polyak*v_targ + (1-polyak)*v_main)
                               for v_main, v_targ in zip(get_vars('main'), get_vars('target'))])
@@ -234,60 +231,7 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
         feed_dictionary = {x_ph: o.reshape(1, -1)}
         if sample_action_with_dropout:
             # Generate post samples
-            # TODO: parallel post sampling to reduce calculation time.
-            # import pdb;
-            # pdb.set_trace()
-            # # def dropout_post_sample(feed_dictionary, pi_new_dropout_masks, pi):
-            # #     """Get post samples with dropout masks."""
-            # #     pi_dropout_masks = sess.run(pi_new_dropout_masks)
-            # #     for mask_i in range(len(pi_dropout_mask_phs)):
-            # #         feed_dictionary[pi_dropout_mask_phs[mask_i]] = pi_dropout_masks[mask_i]
-            # #     a_post = sess.run(pi, feed_dict=feed_dictionary)[0]
-            # #     return a_post
-            # #
-            # # def without_dropout_predict(feed_dictionary, pi_new_dropout_masks, pi):
-            # #     """Get prediction without dropout mask."""
-            # #     for mask_i in range(len(pi_dropout_mask_phs)):
-            # #         feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_new_dropout_masks[mask_i].shape.as_list())
-            # #     a_post = sess.run(pi, feed_dict=feed_dictionary)[0]
-            # #     return a_post
-            # #
-            # # with Pool(processes=n_post_action+1) as pool:
-            # #     post_sample_pools = []
-            # #     for p_i in range(n_post_action):
-            # #         post_sample_pools.append(pool.apply(dropout_post_sample,
-            # #                                     (feed_dictionary, pi_new_dropout_masks, pi,)))
-            # #     predict_pool = pool.apply(without_dropout_predict,
-            # #                               (feed_dictionary, pi_new_dropout_masks, pi,))
-            # #     a_post = np.array([p_tmp.get() for p_tmp in post_sample_pools])
-            # #     a_pred = predict_pool.get()
-            #
-            # with Pool(processes=n_post_action+1) as pool:
-            #     post_sample_pools = []
-            #     for p_i in range(n_post_action):
-            #         post_sample_pools.append(pool.apply(sess.run,(pi_new_dropout_masks,)))
-            #
-            # # def condition(p_i):
-            # #     return p_i < n_post_action
-            # # def body(p_i, a_post):
-            # #     pi_dropout_masks = sess.run(pi_new_dropout_masks)
-            # #     for mask_i in range(len(pi_dropout_mask_phs)):
-            # #         feed_dictionary[pi_dropout_mask_phs[mask_i]] = pi_dropout_masks[mask_i]
-            # #     a_post[p_i] = sess.run(pi, feed_dict=feed_dictionary)[0]
-            #
-            # import pdb;
-            # pdb.set_trace()
-            # a_post = np.zeros((n_post_action, act_dim))
-            # p_i, a_post= tf.while_loop(condition, body, (0, a_post))
-            # TODO: use tf.graph_util.extract_sub_graph estract sub_graph for pi, then
-            #   run extracted sub_graphs in parallel.
-
-            @ray.remote
-            class PostSampler(object):
-                def __init__(self, pi_dropout_mask_generator, pi_dropout_mask_phs,):
-                    self.sess = tf.Session()
-                    self.pi
-            
+            # TODO: Tried to use ray implementing parallel post sampling but no speed up in one machine.
             # Non-parallel post sample
             a_post = np.zeros((n_post_action, act_dim))
             for post_i in range(n_post_action):
@@ -298,12 +242,10 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
 
                 a_post[post_i] = sess.run(pi, feed_dict=feed_dictionary)[0]
 
-
-            # TODO: replace var with std might be better
-            # Choose one action from post samples
             # TODO: var and std must been scaled or clipped.
-            #  Otherwise, a huge variance will always cause action out of act_lim and then be clipped to -1 or 1.
-            #  we also need to set a lower bound to enforce a minimum exploration
+            #  Otherwise, a huge variance will always cause action out of act_lim and
+            #  then be clipped to -1 or 1.
+            #  We also need to set a lower bound to enforce a minimum exploration
             a_mean = np.mean(a_post, axis=0)
             a_median = np.median(a_post, axis=0)
 
@@ -314,11 +256,11 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
             a_std = np.std(a_post, axis=0)
             a_std_clipped = np.clip(a_std, a_std_clip_min, a_std_clip_max)
             a_std_noise = a_std_clipped * np.random.randn(act_dim)
-            # TODO: define uncertainty to a value that is not affect by action dimension.
-            a_var_uncertainty = np.mean(a_var)#np.sum(a_var)
-            a_var_uncertainty_clipped = np.mean(a_var_clipped) #np.sum(a_var_clipped)
-            a_std_uncertainty = np.mean(a_std) #np.sum(a_std)
-            a_std_uncertainty_clipped = np.mean(a_std_clipped) #np.sum(a_std_clipped)
+            # Calculate uncertainty
+            a_var_uncertainty = np.mean(a_var)
+            a_var_uncertainty_clipped = np.mean(a_var_clipped)
+            a_std_uncertainty = np.mean(a_std)
+            a_std_uncertainty_clipped = np.mean(a_std_clipped)
 
             # TODO: clip noise within a range. Maybe not necessary.
             if uncertainty_noise_type == 'var_noise':

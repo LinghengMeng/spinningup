@@ -57,13 +57,6 @@ class DropoutMaskGenerator:
             new_dropout_masks.append(np.random.binomial(1, self.model_prob, (size,)))
         return new_dropout_masks
 
-# def update_dropout_masks(x_dim, hidden_sizes=(32,), model_prob=0.9):
-#     model_bern = Bernoulli(probs=model_prob, dtype=tf.float32)
-#     new_dropout_masks = []
-#     for l, size in enumerate((x_dim, *hidden_sizes)):
-#         new_dropout_masks.append(model_bern.sample((size,)))
-#     return new_dropout_masks
-
 def placeholder(dim=None):
     return tf.placeholder(dtype=tf.float32, shape=(None,dim) if dim else (None,))
 
@@ -142,7 +135,6 @@ def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
     elif nn_type == 'mlp_variational':
         with tf.variable_scope('pi'):
             pi_in_dim = x.shape.as_list()[1]
-            # pi_new_dropout_masks = update_dropout_masks(pi_in_dim, hidden_sizes, model_prob=1.0 - dropout_rate)
             pi_dropout_mask_generator = DropoutMaskGenerator(pi_in_dim, hidden_sizes, model_prob=1.0 - dropout_rate)
             pi_dropout_mask_phs = generate_dropout_mask_placeholders(pi_in_dim, hidden_sizes)
 
@@ -151,16 +143,15 @@ def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
         with tf.variable_scope('q'):
             q_in_ph = tf.concat([x, a], axis=-1)
             q_in_dim = q_in_ph.shape.as_list()[1]
-            # q_new_dropout_masks = update_dropout_masks(q_in_dim, hidden_sizes, model_prob=1.0 - dropout_rate)
             q_dropout_mask_generator = DropoutMaskGenerator(q_in_dim, hidden_sizes, model_prob=1.0 - dropout_rate)
             q_dropout_mask_phs = generate_dropout_mask_placeholders(q_in_dim, hidden_sizes)
 
             q, q_reg = mlp_variational(q_in_ph, q_dropout_mask_phs, list(hidden_sizes) + [1],
-                                   activation, None, dropout_rate)
+                                       activation, None, dropout_rate)
             q = tf.squeeze(q, axis=1)
         with tf.variable_scope('q', reuse=True):
             q_pi, q_pi_reg = mlp_variational(tf.concat([x, pi], axis=-1), q_dropout_mask_phs, list(hidden_sizes) + [1],
-                                      activation, None, dropout_rate)
+                                             activation, None, dropout_rate)
             q_pi = tf.squeeze(q_pi, axis=1)
     else:
         raise ValueError('Please choose a proper nn_type!')
