@@ -18,37 +18,6 @@ class SimpleDense:
         output = self.activation(tf.matmul(X, self.model_W) + self.model_b)
         return output
 
-class VariationalDense:
-    """Variational Dense Layer Class"""
-    def __init__(self, n_in, n_out, model_prob=0.9, model_lam=1e-2, activation=None, name="hidden"):
-        self.model_prob = model_prob    # probability to keep units
-        self.model_lam = model_lam      # l^2 / 2*tau
-        self.model_bern = Bernoulli(probs=self.model_prob, dtype=tf.float32)
-        self.dropout_mask = self.model_bern.sample((n_in, ))
-
-        if activation is None:
-            self.activation = tf.identity
-        else:
-            self.activation = activation
-
-        kernel_initializer = tf.initializers.truncated_normal(mean=0.0, stddev=0.01)
-        self.model_M = tf.get_variable("{}_M".format(name), initializer=kernel_initializer([n_in, n_out])) # variational parameters
-        self.model_m = tf.get_variable("{}_b".format(name), initializer=tf.zeros([n_out]))
-
-        self.model_W = tf.matmul(tf.diag(self.dropout_mask), self.model_M)
-        self.model_W = self.model_M
-
-    def __call__(self, X):
-        output = self.activation(tf.matmul(X, self.model_W) + self.model_m)
-        return output
-
-    @property
-    def regularization(self):
-        return self.model_lam * (
-            self.model_prob * tf.reduce_sum(tf.square(self.model_M)) +
-            tf.reduce_sum(tf.square(self.model_m))
-        )
-
 def placeholder(dim=None):
     return tf.placeholder(dtype=tf.float32, shape=(None,dim) if dim else (None,))
 
@@ -57,7 +26,6 @@ def placeholders(*args):
 
 def mlp_simple(x, hidden_sizes=(32,), activation=tf.tanh, output_activation=None):
     # Hidden layers
-    regularization = 0
     for l, h in enumerate(hidden_sizes[:-1]):
         hidden_layer = SimpleDense(n_in=x.shape.as_list()[1],
                                         n_out=h,
@@ -71,29 +39,6 @@ def mlp_simple(x, hidden_sizes=(32,), activation=tf.tanh, output_activation=None
                                  name="Out")
     x = out_layer(x)
     return x
-
-def mlp_variational(x, hidden_sizes=(32,), activation=tf.tanh, output_activation=None, dropout_rate=0):
-    # Hidden layers
-    regularization = 0
-    for l, h in enumerate(hidden_sizes[:-1]):
-        hidden_layer = VariationalDense(n_in=x.shape.as_list()[1],
-                                        n_out=h,
-                                        model_prob=1.0-dropout_rate,
-                                        model_lam=1e-2,
-                                        activation=activation,
-                                        name="h{}".format(l+1))
-        x = hidden_layer(x)
-        regularization += hidden_layer.regularization
-    # Output layer
-    out_layer = VariationalDense(n_in=x.shape.as_list()[1],
-                                 n_out=hidden_sizes[-1],
-                                 model_prob=1.0-dropout_rate,
-                                 model_lam=1e-2,
-                                 activation=output_activation,
-                                 name="Out")
-    x = out_layer(x)
-    regularization += out_layer.regularization
-    return x, regularization
 
 def mlp(x, hidden_sizes=(32,), activation=tf.tanh, output_activation=None):
     for h in hidden_sizes[:-1]:
@@ -126,22 +71,9 @@ def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
         with tf.variable_scope('pi'):
             pi = act_limit * mlp_simple(x, list(hidden_sizes) + [act_dim], activation, output_activation)
         with tf.variable_scope('q'):
-            q = tf.squeeze(mlp_simple(tf.concat([x,a], axis=-1), list(hidden_sizes)+[1], activation, output_activation), axis=1)
+            q = tf.squeeze(mlp_simple(tf.concat([x,a], axis=-1), list(hidden_sizes)+[1], activation, None), axis=1)
         with tf.variable_scope('q', reuse=True):
-            q_pi = tf.squeeze(mlp_simple(tf.concat([x,pi], axis=-1), list(hidden_sizes)+[1], activation, output_activation), axis=1)
-
-    elif nn_type == 'variational_dense':
-        with tf.variable_scope('pi'):
-            pi, _ = mlp_variational(x, list(hidden_sizes) + [act_dim], activation, output_activation, dropout_rate)
-            pi = act_limit * pi
-        with tf.variable_scope('q'):
-            q, _ = mlp_variational(tf.concat([x, a], axis=-1), list(hidden_sizes) + [1], activation, None,
-                                    dropout_rate)
-            q = tf.squeeze(q, axis=1)
-        with tf.variable_scope('q', reuse=True):
-            q_pi, _ = mlp_variational(tf.concat([x, pi], axis=-1), list(hidden_sizes) + [1], activation, None,
-                                       dropout_rate)
-            q_pi = tf.squeeze(q_pi, axis=1)
+            q_pi = tf.squeeze(mlp_simple(tf.concat([x,pi], axis=-1), list(hidden_sizes)+[1], activation, None), axis=1)
 
     else:
         raise ValueError('Please choose a right nn_type!')

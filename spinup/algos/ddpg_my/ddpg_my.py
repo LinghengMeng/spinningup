@@ -45,9 +45,11 @@ Deep Deterministic Policy Gradient (DDPG)
 
 """
 def ddpg_my(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), nn_type='simple_dense', seed=0,
-         steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, 
-         polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000, 
-         act_noise=0.1, policy_delay=2, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
+            steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99,
+            polyak=0.995, pi_lr=1e-3, q_lr=1e-3,
+            without_start_steps=True, batch_size=100, start_steps=10000,
+            without_delay_train=False,
+            act_noise=0.1, policy_delay=2, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
 
     Args:
@@ -115,6 +117,9 @@ def ddpg_my(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), nn_typ
             the current policy and value function.
 
     """
+    # TODO: Test no start steps
+    if without_start_steps:
+        start_steps = batch_size
 
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
@@ -229,29 +234,47 @@ def ddpg_my(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), nn_typ
         # most recent observation!
         o = o2
 
+        if without_delay_train:
+            batch = replay_buffer.sample_batch(batch_size)
+            feed_dict = {x_ph: batch['obs1'],
+                         x2_ph: batch['obs2'],
+                         a_ph: batch['acts'],
+                         r_ph: batch['rews'],
+                         d_ph: batch['done']
+                         }
+
+            # Q-learning update
+            outs = sess.run([q_loss, q, train_q_op], feed_dict)
+            logger.store(LossQ=outs[0], QVals=outs[1])
+
+            # Policy update
+            outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+            logger.store(LossPi=outs[0])
+
         if d or (ep_len == max_ep_len):
             """
             Perform all DDPG updates at the end of the trajectory,
             in accordance with tuning done by TD3 paper authors.
             """
-            for j in range(ep_len):
-                batch = replay_buffer.sample_batch(batch_size)
-                feed_dict = {x_ph: batch['obs1'],
-                             x2_ph: batch['obs2'],
-                             a_ph: batch['acts'],
-                             r_ph: batch['rews'],
-                             d_ph: batch['done']
-                            }
+            if not without_delay_train:
+                for j in range(ep_len):
+                    batch = replay_buffer.sample_batch(batch_size)
+                    feed_dict = {x_ph: batch['obs1'],
+                                 x2_ph: batch['obs2'],
+                                 a_ph: batch['acts'],
+                                 r_ph: batch['rews'],
+                                 d_ph: batch['done']
+                                }
 
-                # Q-learning update
-                outs = sess.run([q_loss, q, train_q_op], feed_dict)
-                logger.store(LossQ=outs[0], QVals=outs[1])
+                    # Q-learning update
+                    outs = sess.run([q_loss, q, train_q_op], feed_dict)
+                    logger.store(LossQ=outs[0], QVals=outs[1])
 
-                # Policy update
-                if j % policy_delay == 0:
-                    # Delayed policy update
-                    outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
-                    logger.store(LossPi=outs[0])
+                    # Policy update
+                    if j % policy_delay == 0:
+                        # Delayed policy update
+                        outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+                        logger.store(LossPi=outs[0])
 
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
@@ -288,10 +311,12 @@ if __name__ == '__main__':
     parser.add_argument('--hid', type=int, default=300)
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--nn_type', choices=['tf_dense', 'simple_dense', 'variational_dense'], default='simple_dense')
+    parser.add_argument('--without_start_steps', action='store_true')
 
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
     parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--exp_name', type=str, default='ddpg_my')
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
 
@@ -314,6 +339,8 @@ if __name__ == '__main__':
     ddpg_my(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
             ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
             nn_type=args.nn_type,
+            without_start_steps = args.without_start_steps,
+            without_delay_train=args.without_delay_train,
             gamma=args.gamma, seed=args.seed, epochs=args.epochs,
             logger_kwargs=logger_kwargs)
 
