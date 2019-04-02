@@ -206,12 +206,25 @@ def dedpg(env_fn, actor_critic_ensemble=core.mlp_actor_critic_ensemble,
 
     def get_action(o, noise_scale):
         # TODO: Take action according to estimated uncertainty
-        take_mean_action = False
-        a = np.zeros([act_dim, len(ac_ensemble)])
+        # take_mean_action = False
+        # a = np.zeros([act_dim, len(ac_ensemble)])
+        # for ac_i, ac_name in enumerate(ac_ensemble.keys()):
+        #     a[:, ac_i] = sess.run(ac_ensemble[ac_name]['pi'], feed_dict={x_ph: o.reshape(1, -1)})[0]
+        # a = np.mean(a, axis=1)  # mean of actions of ensemble
+        # a += noise_scale * np.random.randn(act_dim)
+
+        a_ensemble = np.zeros((len(ac_ensemble), act_dim))
         for ac_i, ac_name in enumerate(ac_ensemble.keys()):
-            a[:, ac_i] = sess.run(ac_ensemble[ac_name]['pi'], feed_dict={x_ph: o.reshape(1, -1)})[0]
-        a = np.mean(a, axis=1)  # mean of actions of ensemble
-        a += noise_scale * np.random.randn(act_dim)
+            a_ensemble[ac_i] = sess.run(ac_ensemble[ac_name]['pi'], feed_dict={x_ph: o.reshape(1, -1)})[0]
+
+        a_cov = np.cov(a_ensemble, rowvar=False)
+        a_mean = np.mean(a_ensemble, axis=0)
+        a_median = np.median(a_ensemble, axis=0)
+        # TODO: store this covariance for investigate
+        concentration_factor = 0.1
+        minimum_exploration_level = 0
+        a_cov_shaped = concentration_factor * a_cov + minimum_exploration_level * np.ones(a_cov.shape)
+        a = np.random.multivariate_normal(a_mean, a_cov_shaped, 1)[0]
         return np.clip(a, -act_limit, act_limit)
 
     def test_agent(n=10):
@@ -332,13 +345,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
     parser.add_argument('--hid', type=int, default=300)
-    parser.add_argument('--l', type=int, default=1)
+    parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--feed_ac_ensemble_with_same_batch', action='store_true')
-    parser.add_argument('--exp_name', type=str, default='dedpg_3ac')
-    parser.add_argument('--ensemble_size', type=int, default=3)
+    parser.add_argument('--exp_name', type=str, default='dedpg_5ac')
+    parser.add_argument('--ensemble_size', type=int, default=5)
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
 
     parser.add_argument("--exploration-strategy", type=str, choices=["action_noise", "epsilon_greedy"],
