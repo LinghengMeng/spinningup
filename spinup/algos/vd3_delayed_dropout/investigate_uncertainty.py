@@ -21,26 +21,38 @@ class UncertaintyModule(object):
         self.obs_set_is_empty = True
         self.track_obs_set_unc_frequency = track_obs_set_unc_frequency
 
-        self.logger = Logger(output_fname='uncertainty.txt', **logger_kwargs)
+        self.uncertainty_logger = Logger(output_fname='uncertainty.txt', **logger_kwargs)
+        self.sample_logger = Logger(output_fname='sample_observation.txt', **logger_kwargs)
 
     def sample_obs_set_from_replay_buffer(self, replay_buffer):
         """Sample an obs set from replay buffer."""
         self.obs_set = replay_buffer.sample_batch(self.obs_set_size)['obs1']
         self.obs_set_is_empty = False
+        # Save sampled observations
+        for i, o in enumerate(self.obs_set):
+            self.sample_logger.log_tabular('Observation', i)
+            # import pdb; pdb.set_trace()
+            for dim, o_i in enumerate(o):
+                self.sample_logger.log_tabular('o_{}'.format(dim), o_i)
+            self.sample_logger.dump_tabular(print_data=False)
 
     def calculate_obs_set_uncertainty(self, sess,epoch, step):
-        self.logger.log_tabular('Epoch', epoch)
-        self.logger.log_tabular('Step', step)
+        self.uncertainty_logger.log_tabular('Epoch', epoch)
+        self.uncertainty_logger.log_tabular('Step', step)
         for obs_i, obs in enumerate(self.obs_set):
             # import pdb
             # pdb.set_trace()
             a_post = self.get_post_samples(obs, sess)
             a_cov = np.cov(a_post, rowvar=False)
-            a_unc_cov = np.sum(np.triu(a_cov))  # summation of upper triangle of an array as uncertainty
-            a_unc_var = np.sum(np.diag(a_cov))  # summation of upper triangle of an array as uncertainty
-            self.logger.log_tabular('Obs{}_cov'.format(obs_i), a_unc_cov)
-            self.logger.log_tabular('Obs{}_var'.format(obs_i), a_unc_var)
-        self.logger.dump_tabular()
+            if a_post.shape[1] != 1:
+                a_unc_cov = np.sum(np.triu(a_cov))  # summation of upper triangle of an array as uncertainty
+                a_unc_var = np.sum(np.diag(a_cov))
+            else:
+                a_unc_cov = np.sum(a_cov)
+                a_unc_var = np.sum(a_cov)  # summation of upper triangle of an array as uncertainty
+            self.uncertainty_logger.log_tabular('Obs{}_cov'.format(obs_i), a_unc_cov)
+            self.uncertainty_logger.log_tabular('Obs{}_var'.format(obs_i), a_unc_var)
+        self.uncertainty_logger.dump_tabular(print_data=False)
 
     def get_post_samples(self, obs, sess):
         """Return a post sample matrix for an observation."""
@@ -51,5 +63,6 @@ class UncertaintyModule(object):
             pi_dropout_masks = self.pi_dropout_mask_generator.generate_dropout_mask()
             for mask_i in range(len(self.pi_dropout_mask_phs)):
                 feed_dictionary[self.pi_dropout_mask_phs[mask_i]] = pi_dropout_masks[mask_i]
+            # import pdb; pdb.set_trace()
             a_post[post_i] = sess.run(self.pi, feed_dict=feed_dictionary)[0]
         return a_post
