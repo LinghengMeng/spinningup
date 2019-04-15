@@ -226,7 +226,7 @@ class Logger:
             tf.saved_model.simple_save(export_dir=fpath, **self.tf_saver_elements)
             joblib.dump(self.tf_saver_info, osp.join(fpath, 'model_info.pkl'))
     
-    def dump_tabular(self):
+    def dump_tabular(self, print_data=True):
         """
         Write all of the diagnostics from the current iteration.
 
@@ -239,13 +239,19 @@ class Logger:
             keystr = '%'+'%d'%max_key_len
             fmt = "| " + keystr + "s | %15s |"
             n_slashes = 22 + max_key_len
-            print("-"*n_slashes)
-            for key in self.log_headers:
-                val = self.log_current_row.get(key, "")
-                valstr = "%8.3g"%val if hasattr(val, "__float__") else val
-                print(fmt%(key, valstr))
-                vals.append(val)
-            print("-"*n_slashes)
+            if print_data:
+                print("-"*n_slashes)
+                for key in self.log_headers:
+                    val = self.log_current_row.get(key, "")
+                    valstr = "%8.3g"%val if hasattr(val, "__float__") else val
+                    print(fmt%(key, valstr))
+                    vals.append(val)
+                print("-"*n_slashes)
+            else:
+                for key in self.log_headers:
+                    val = self.log_current_row.get(key, "")
+                    vals.append(val)
+
             if self.output_file is not None:
                 if self.first_row:
                     self.output_file.write("\t".join(self.log_headers)+"\n")
