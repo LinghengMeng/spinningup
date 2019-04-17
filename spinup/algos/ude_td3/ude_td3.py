@@ -13,7 +13,11 @@ class ReplayBuffer:
     A simple FIFO experience replay buffer for TD3 agents.
     """
 
-    def __init__(self, obs_dim, act_dim, size):
+    def __init__(self, obs_dim, act_dim, size,
+                 logger_fname='experiences_log.txt', **logger_kwargs):
+        # ExperienceLogger: save experiences for supervised learning
+        logger_kwargs['output_fname'] = logger_fname
+        self.experience_logger = Logger(**logger_kwargs)
         self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
         self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
         self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
@@ -21,7 +25,12 @@ class ReplayBuffer:
         self.done_buf = np.zeros(size, dtype=np.float32)
         self.ptr, self.size, self.max_size = 0, 0, size
 
-    def store(self, obs, act, rew, next_obs, done):
+    def store(self, obs, act, rew, next_obs, done,
+              uncertainty, step_index, steps_per_epoch, start_time):
+        # Save experiences in disk
+        self.log_experiences(obs, act, rew, next_obs, done,
+                             uncertainty, step_index, steps_per_epoch, start_time)
+        # Save experiences in memory
         self.obs1_buf[self.ptr] = obs
         self.obs2_buf[self.ptr] = next_obs
         self.acts_buf[self.ptr] = act
@@ -38,6 +47,30 @@ class ReplayBuffer:
                     rews=self.rews_buf[idxs],
                     done=self.done_buf[idxs])
 
+    def log_experiences(self, obs, act, rew, next_obs, done,
+                        uncertainty, step_index, steps_per_epoch, start_time):
+        self.experience_logger.log_tabular('Epoch', step_index // steps_per_epoch)
+        self.experience_logger.log_tabular('Step', step_index)
+        # Log observation
+        for i, o_i in enumerate(obs):
+            self.experience_logger.log_tabular('o_{}'.format(i), o_i)
+        # Log action
+        for i, a_i in enumerate(act):
+            self.experience_logger.log_tabular('a_{}'.format(i), a_i)
+        # Log reward
+        self.experience_logger.log_tabular('r', rew)
+        # Log next observation
+        for i, o2_i in enumerate(next_obs):
+            self.experience_logger.log_tabular('o2_{}'.format(i), o2_i)
+        # TODO: save uncertainty
+        # Log uncertainty: flatten in row-major order
+        for i, unc_i in enumerate(np.array(uncertainty).flatten(order='C')):
+            self.experience_logger.log_tabular('unc_{}'.format(i), unc_i)
+        # Log done
+        self.experience_logger.log_tabular('d', done)
+        self.experience_logger.log_tabular('Time', time.time() - start_time)
+        self.experience_logger.dump_tabular(print_data=False)
+
 """
 
 UDE-TD3 (Uncertainty Driven Exploration Twin Delayed DDPG)
@@ -53,12 +86,9 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             n_post_action=10,
             uncertainty_method='dropout',
             sample_obs_std=1,
-            sample_action_with_dropout=False,
+            uncertainty_driven_exploration=False,
+            uncertainty_policy_delay=5000,
             dropout_rate=0.1,
-            action_choose_method='random_sample',
-            uncertainty_noise_type='std_noise',
-            a_var_clip_max=1, a_var_clip_min=0.1,
-            a_std_clip_max=1, a_std_clip_min=0.1,
             concentration_factor=0.1,
             minimum_exploration_level=0,
             ):
@@ -144,11 +174,8 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
     # TODO: Test no start steps
     if without_start_steps:
         start_steps = batch_size
-
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
-    # ExperienceLogger: save experiences for supervised learning
-    experience_logger = Logger(output_fname='experiences.txt', **logger_kwargs)
 
     tf.set_random_seed(seed)
     np.random.seed(seed)
@@ -205,6 +232,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
     
     # Target Q networks
     with tf.variable_scope('target', reuse=True):
+        # TODO: add with_out_policy_smoothing
         # Target policy smoothing, by adding clipped noise to target actions
         epsilon = tf.random_normal(tf.shape(pi_targ), stddev=target_noise)
         epsilon = tf.clip_by_value(epsilon, -noise_clip, noise_clip)
@@ -217,7 +245,8 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         q2_targ, _, q2_dropout_mask_generator_targ, q2_dropout_mask_phs_targ = actor_critic(x2_ph, a2, **ac_kwargs, dropout_rate=0)
 
     # Experience buffer
-    replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
+    replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size,
+                                 logger_fname='experiences_log.txt', **logger_kwargs)
 
     # Count variables
     var_counts = tuple(core.count_vars(scope) for scope in ['main/pi', 'main/q1', 'main/q2', 'main'])
@@ -255,114 +284,40 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
     # Setup model saving
     logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q1': q1, 'q2': q2})
 
-    # def get_action_train(o, noise_scale):
-    #     feed_dict = {x_ph: o.reshape(1, -1)}
-    #     for mask_i in range(len(pi_dropout_mask_phs)):
-    #         feed_dict[pi_dropout_mask_phs[mask_i]] = np.ones(pi_dropout_mask_phs[mask_i].shape.as_list())
-    #     a = sess.run(pi, feed_dict=feed_dict)[0]
-    #     a += noise_scale * np.random.randn(act_dim)
-    #     return np.clip(a, -act_limit, act_limit)
-
     def get_action_train(o, noise_scale, pi_unc_module, step_index):
-        a_var_uncertainty = 0
-        a_var_uncertainty_clipped = 0
-        a_std_uncertainty = 0
-        a_std_uncertainty_clipped = 0
-
         feed_dictionary = {x_ph: o.reshape(1, -1)}
-        #TODO：use uncertainty to decide rather than dropout
-        if sample_action_with_dropout:
-            # Generate post samples
-            # TODO: Tried to use ray implementing parallel post sampling but no speed up in one machine.
-            # Non-parallel post sample
+        if uncertainty_driven_exploration:
+            # 1. Generate Prediction
+            for mask_i in range(len(pi_dropout_mask_phs)):
+                feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_dropout_mask_phs[mask_i].shape.as_list())
+            a_prediction = sess.run(pi, feed_dict=feed_dictionary)[0]
+
+            # 2. Generate post samples in Non-parallel way
+            #    (Tried to use ray implementing parallel post sampling but no speed up in one machine.)
             a_post = pi_unc_module.get_post_samples(o, sess, step_index)
-            # import pdb; pdb.set_trace()
-            # a_post = np.zeros((n_post_action, act_dim))
-            # for post_i in range(n_post_action):
-            #     # import pdb; pdb.set_trace()
-            #     pi_dropout_masks = pi_dropout_mask_generator.generate_dropout_mask()
-            #     for mask_i in range(len(pi_dropout_mask_phs)):
-            #         feed_dictionary[pi_dropout_mask_phs[mask_i]] = pi_dropout_masks[mask_i]
-            #
-            #     a_post[post_i] = sess.run(pi, feed_dict=feed_dictionary)[0]
 
-            # TODO: var and std must been scaled or clipped.
-            #  Otherwise, a huge variance will always cause action out of act_lim and
-            #  then be clipped to -1 or 1.
-            #  We also need to set a lower bound to enforce a minimum exploration
-            a_mean = np.mean(a_post, axis=0)
-            a_median = np.median(a_post, axis=0)
-
-            a_var = np.var(a_post, axis=0)
-            a_var_clipped = np.clip(a_var, a_var_clip_min, a_var_clip_max)
-            a_var_noise = a_var_clipped * np.random.randn(act_dim)
-
-            a_std = np.std(a_post, axis=0)
-            a_std_clipped = np.clip(a_std, a_std_clip_min, a_std_clip_max)
-            a_std_noise = a_std_clipped * np.random.randn(act_dim)
-            # TODO: Save uncertainty for each dimension of action.
-            # Calculate uncertainty
-            a_var_uncertainty = np.mean(a_var)
-            a_var_uncertainty_clipped = np.mean(a_var_clipped)
-            a_std_uncertainty = np.mean(a_std)
-            a_std_uncertainty_clipped = np.mean(a_std_clipped)
-
-            # TODO: clip noise within a range. Maybe not necessary.
-            if uncertainty_noise_type == 'var_noise':
-                noise = a_var_noise
-            elif uncertainty_noise_type == 'std_noise':
-                noise = a_std_noise
-            else:
-                raise ValueError('Please choose a proper noise_type.')
+            # 3. Generate uncertainty-driven exploratory action
             a = np.zeros((act_dim,))
-            if action_choose_method == 'random_sample':
-                # Method 1: randomly sample one from post sampled actions
-                a = a_post[np.random.choice(n_post_action)]
-            elif action_choose_method == 'gaussian_sample':
-                # Method 2: estimate mean and std, then sample from a Gaussian distribution
-                for a_i in range(act_dim):
-                    a[a_i] = np.random.normal(a_mean[a_i], a_std_clipped[a_i], 1)
-            elif action_choose_method == 'mean_of_samples':
-                a = a_mean
-            elif action_choose_method == 'median_of_sample':
-                pass
-            elif action_choose_method == 'mean_and_variance_based_noise':
-                a = a_mean+noise
-            elif action_choose_method == 'median_and_variance_based_noise':
-                a = a_median+noise
-            elif action_choose_method == 'prediction_and_variance_based_noise':
-                for mask_i in range(len(pi_dropout_mask_phs)):
-                    feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_dropout_mask_phs[mask_i].shape.as_list())
-                a_prediction = sess.run(pi, feed_dict=feed_dictionary)[0]
-                a = a_prediction + noise
-            elif action_choose_method == 'gaussian_sample_with_scaling_and_lower_bound':
-                # TODO: store this covariance for investigate
-                # a = np.random.multivariate_normal(a_mean, a_cov_shaped, 1)[0]
-                # a = np.random.multivariate_normal(a_median, a_cov_shaped, 1)[0]
-                for mask_i in range(len(pi_dropout_mask_phs)):
-                    feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_dropout_mask_phs[mask_i].shape.as_list())
-                a_prediction = sess.run(pi, feed_dict=feed_dictionary)[0]
-
-                if act_dim >1:
-                    a_cov = np.cov(a_post, rowvar=False)
-                    a_cov_shaped = concentration_factor * a_cov + minimum_exploration_level * np.ones(a_cov.shape)
-                    a = np.random.multivariate_normal(a_prediction, a_cov_shaped, 1)[0]
-                else:
-                    # TODO: use std rather than var
-                    a_var_shaped = concentration_factor * a_var + minimum_exploration_level * np.ones(a_var.shape)
-                    a = np.random.normal(a_prediction, a_var_shaped, 1)[0]
+            if act_dim >1:
+                a_cov = np.cov(a_post, rowvar=False)
+                a_cov_shaped = concentration_factor * a_cov + minimum_exploration_level * np.ones(a_cov.shape)
+                a = np.random.multivariate_normal(a_prediction, a_cov_shaped, 1)[0]
+                uncertainty = a_cov
             else:
-                pass
+                a_std = np.std(a_post, axis=0)
+                a_std_shaped = concentration_factor * a_std + minimum_exploration_level * np.ones(a_std.shape)
+                a = np.random.normal(a_prediction, a_std_shaped, 1)[0]
+                uncertainty = np.var(a_post, axis=0)
         else:
             for mask_i in range(len(pi_dropout_mask_phs)):
                 feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_dropout_mask_phs[mask_i].shape.as_list())
             a = sess.run(pi, feed_dict=feed_dictionary)[0]
             a += noise_scale * np.random.randn(act_dim)
-        return np.clip(a, -act_limit, act_limit), \
-               a_var_uncertainty, a_var_uncertainty_clipped, a_std_uncertainty, a_std_uncertainty_clipped
+            uncertainty = 0
+        return np.clip(a, -act_limit, act_limit), uncertainty
 
     def get_action_test(o):
-        """Get deterministic action without noise and dropout."""
+        """Get deterministic action without exploration."""
         feed_dictionary = {x_ph: o.reshape(1, -1)}
         for mask_i in range(len(pi_dropout_mask_phs)):
             feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_dropout_mask_phs[mask_i].shape.as_list())
@@ -380,9 +335,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
     start_time = time.time()
-    o, r, d, ep_ret, ep_len, \
-    ep_a_var_uncertainty, ep_a_var_uncertainty_clipped, \
-    ep_a_std_uncertainty, ep_a_std_uncertainty_clipped = env.reset(), 0, False, 0, 0, 0, 0, 0, 0
+    o, r, d, ep_ret, ep_len, ep_uncertainty = env.reset(), 0, False, 0, 0, 0
     total_steps = steps_per_epoch * epochs
 
     # No dropout for training phase: set all dropout masks to one
@@ -409,16 +362,14 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         use the learned policy (with some noise, via act_noise). 
         """
         if t > start_steps:
-            a, a_var_uncertainty, a_var_uncertainty_clipped, \
-            a_std_uncertainty, a_std_uncertainty_clipped = get_action_train(o, act_noise,
-                                                                            pi_unc_module, step_index=t)
+            a, uncertainty = get_action_train(o, act_noise, pi_unc_module, step_index=t)
         else:
             a = env.action_space.sample()
-            # TODO:
-            a_var_uncertainty = 0
-            a_var_uncertainty_clipped = 0
-            a_std_uncertainty = 0
-            a_std_uncertainty_clipped = 0
+            # TODO：keep the same dimension with real covariance
+            if uncertainty_driven_exploration:
+                uncertainty = np.zeros((act_dim, act_dim))
+            else:
+                uncertainty = 0
 
         # Sample an observation set to track their uncertainty trajectories
         if t > start_steps:
@@ -428,19 +379,15 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             if t % pi_unc_module.track_obs_set_unc_frequency == 0:
                 pi_unc_module.calculate_obs_set_uncertainty(sess, t // steps_per_epoch, t)
 
-            #TODO: Update every 1000 steps rather than 5000 steps
             # Update uncertainty policy to current policy
-            if ep_len == max_ep_len:
+            if t % uncertainty_policy_delay == 0:
                 pi_unc_module.uncertainty_policy_update(sess)
 
         # Step the env
         o2, r, d, _ = env.step(a)
         ep_ret += r
         ep_len += 1
-        ep_a_var_uncertainty += a_var_uncertainty
-        ep_a_var_uncertainty_clipped += a_var_uncertainty_clipped
-        ep_a_std_uncertainty += a_std_uncertainty
-        ep_a_std_uncertainty_clipped += a_std_uncertainty_clipped
+        ep_uncertainty += np.sum(uncertainty)
 
         # Ignore the "done" signal if it comes from hitting the time
         # horizon (that is, when it's an artificial terminal signal
@@ -448,25 +395,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        replay_buffer.store(o, a, r, o2, d)
-
-        # TODO: put save experiences into replay_buffer
-        # Save experience
-        def log_experiences(o, a, r, o2, d, t, steps_per_epoch, start_time):
-            experience_logger.log_tabular('Epoch', t // steps_per_epoch)
-            experience_logger.log_tabular('Step', t)
-            for i, o_i in enumerate(o):
-                experience_logger.log_tabular('o_{}'.format(i), o_i)
-            for i, a_i in enumerate(a):
-                experience_logger.log_tabular('a_{}'.format(i), a_i)
-            experience_logger.log_tabular('r', r)
-            for i, o2_i in enumerate(o2):
-                experience_logger.log_tabular('o2_{}'.format(i), o2_i)
-            experience_logger.log_tabular('d', d)
-            experience_logger.log_tabular('Time', time.time() - start_time)
-            experience_logger.dump_tabular(print_data=False)
-
-        log_experiences(o, a, r, o2, d, t, steps_per_epoch, start_time)
+        replay_buffer.store(o, a, r, o2, d, uncertainty, t, steps_per_epoch, start_time)
 
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
@@ -512,13 +441,8 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
                         logger.store(LossPi=outs[0])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len,
-                         EpVarUncertainty=ep_a_var_uncertainty,
-                         EpVarUncertaintyClipped=ep_a_var_uncertainty_clipped,
-                         EpStdUncertainty=ep_a_std_uncertainty,
-                         EpStdUncertaintyClipped=ep_a_std_uncertainty_clipped)
-            o, r, d, ep_ret, ep_len, \
-            ep_a_var_uncertainty, ep_a_var_uncertainty_clipped, \
-            ep_a_std_uncertainty, ep_a_std_uncertainty_clipped = env.reset(), 0, False, 0, 0, 0, 0, 0, 0
+                         EpUncertainty=ep_uncertainty)
+            o, r, d, ep_ret, ep_len, ep_uncertainty = env.reset(), 0, False, 0, 0, 0
 
         # End of epoch wrap-up
         if t > 0 and t % steps_per_epoch == 0:
@@ -542,10 +466,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             logger.log_tabular('Q2Vals', with_min_and_max=True)
             logger.log_tabular('LossPi', average_only=True)
             logger.log_tabular('LossQ', average_only=True)
-            logger.log_tabular('EpVarUncertainty', with_min_and_max=True)
-            logger.log_tabular('EpVarUncertaintyClipped', with_min_and_max=True)
-            logger.log_tabular('EpStdUncertainty', with_min_and_max=True)
-            logger.log_tabular('EpStdUncertaintyClipped', with_min_and_max=True)
+            logger.log_tabular('EpUncertainty', with_min_and_max=True)
             logger.log_tabular('Time', time.time()-start_time)
             logger.dump_tabular()
 
@@ -567,22 +488,10 @@ if __name__ == '__main__':
     parser.add_argument('--uncertainty_method', choices=['dropout', 'gaussian_obs_sample'],
                         default='dropout')
     parser.add_argument('--sample_obs_std', type=float, default=1)
-    parser.add_argument('--sample_action_with_dropout', action='store_true')
+    parser.add_argument('--uncertainty_driven_exploration', action='store_true')
     parser.add_argument('--dropout_rate', type=float, default=0.1)
-    parser.add_argument('--action_choose_method', choices=['random_sample',
-                                                           'gaussian_sample',
-                                                           'mean_and_variance_based_noise',
-                                                           'median_and_variance_based_noise',
-                                                           'prediction_and_variance_based_noise',
-                                                           'gaussian_sample_with_scaling_and_lower_bound'],
-                        default='gaussian_sample_with_scaling_and_lower_bound')
-    parser.add_argument('--uncertainty_noise_type', type=str, choices=['var_noise', 'std_noise'],
-                        default='var_noise')
-    parser.add_argument('--a_var_clip_max', type=float, default=1.0)
-    parser.add_argument('--a_var_clip_min', type=float, default=0.1)
-    parser.add_argument('--a_std_clip_max', type=float, default=1.0)
-    parser.add_argument('--a_std_clip_min', type=float, default=0.1)
-    parser.add_argument('--concentration_factor', type=float, default=0.1)
+    parser.add_argument('--uncertainty_policy_delay', type=int, default=1000)
+    parser.add_argument('--concentration_factor', type=float, default=0.5)
     parser.add_argument('--minimum_exploration_level', type=float, default=0)
 
     args = parser.parse_args()
@@ -599,15 +508,9 @@ if __name__ == '__main__':
             n_post_action=args.n_post_action,
             uncertainty_method=args.uncertainty_method,
             sample_obs_std=args.sample_obs_std,
-            sample_action_with_dropout=args.sample_action_with_dropout,
+            uncertainty_driven_exploration=args.uncertainty_driven_exploration,
+            uncertainty_policy_delay=args.uncertainty_policy_delay,
             dropout_rate=args.dropout_rate,
-            action_choose_method=args.action_choose_method,
-            uncertainty_noise_type=args.uncertainty_noise_type,
-            a_var_clip_max=args.a_var_clip_max, a_var_clip_min=args.a_var_clip_min,
-            a_std_clip_max=args.a_std_clip_max, a_std_clip_min=args.a_std_clip_min,
             concentration_factor=args.concentration_factor,
             minimum_exploration_level=args.minimum_exploration_level,
             logger_kwargs=logger_kwargs)
-
-# python ./spinup/algos/td3/td3.py --env HalfCheetah-v2 --seed 3 --l 2 --exp_name td3_two_layers
-# python ./spinup/algos/td3/td3.py --env Ant-v2 --seed 3 --l 2 --exp_name td3_Ant_v2_two_layers
