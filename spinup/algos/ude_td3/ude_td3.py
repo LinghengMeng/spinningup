@@ -263,7 +263,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
     #     a += noise_scale * np.random.randn(act_dim)
     #     return np.clip(a, -act_limit, act_limit)
 
-    def get_action_train(o, noise_scale, pi_unc_module):
+    def get_action_train(o, noise_scale, pi_unc_module, step_index):
         a_var_uncertainty = 0
         a_var_uncertainty_clipped = 0
         a_std_uncertainty = 0
@@ -275,7 +275,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             # Generate post samples
             # TODO: Tried to use ray implementing parallel post sampling but no speed up in one machine.
             # Non-parallel post sample
-            a_post = pi_unc_module.get_post_samples(o, sess)
+            a_post = pi_unc_module.get_post_samples(o, sess, step_index)
             # import pdb; pdb.set_trace()
             # a_post = np.zeros((n_post_action, act_dim))
             # for post_i in range(n_post_action):
@@ -410,7 +410,8 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         """
         if t > start_steps:
             a, a_var_uncertainty, a_var_uncertainty_clipped, \
-            a_std_uncertainty, a_std_uncertainty_clipped = get_action_train(o, act_noise, pi_unc_module)
+            a_std_uncertainty, a_std_uncertainty_clipped = get_action_train(o, act_noise,
+                                                                            pi_unc_module, step_index=t)
         else:
             a = env.action_space.sample()
             # TODO:
@@ -427,10 +428,10 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             if t % pi_unc_module.track_obs_set_unc_frequency == 0:
                 pi_unc_module.calculate_obs_set_uncertainty(sess, t // steps_per_epoch, t)
 
+            #TODO: Update every 1000 steps rather than 5000 steps
             # Update uncertainty policy to current policy
             if ep_len == max_ep_len:
                 pi_unc_module.uncertainty_policy_update(sess)
-                pi_unc_module.uncertainty_dropout_masks_update()
 
         # Step the env
         o2, r, d, _ = env.step(a)

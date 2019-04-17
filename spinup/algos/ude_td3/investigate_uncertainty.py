@@ -58,7 +58,7 @@ class UncertaintyModule(object):
         for obs_i, obs in enumerate(self.obs_set):
             # import pdb
             # pdb.set_trace()
-            a_post = self.get_post_samples(obs, sess)
+            a_post = self.get_post_samples(obs, sess, step)
             a_cov = np.cov(a_post, rowvar=False)
             if a_post.shape[1] != 1:
                 a_unc_cov = np.sum(np.triu(a_cov))  # summation of upper triangle of an array as uncertainty
@@ -88,16 +88,25 @@ class DropoutUncertaintyModule(UncertaintyModule):
                          pi_dropout_mask_phs, pi_dropout_mask_generator,
                          logger_kwargs, tf_var_scope_main, tf_var_scope_unc, 'dropout')
         self.dropout_masks_set = {i:pi_dropout_mask_generator.generate_dropout_mask() for i in range(n_post_action)}
+        self.delayed_dropout_masks_update = False
+        self.delayed_dropout_masks_update_freq = 1000
 
     def uncertainty_dropout_masks_update(self):
         """Update uncertainty dropout_masks."""
         self.dropout_masks_set = {i: self.pi_dropout_mask_generator.generate_dropout_mask() for i in
                                   range(self.n_post_action)}
 
-    def get_post_samples(self, obs, sess):
+    def get_post_samples(self, obs, sess, step_index):
         """Return a post sample matrix for an observation."""
         feed_dictionary = {self.x_ph: obs.reshape(1, -1)}
         a_post = np.zeros((self.n_post_action, self.act_dim))
+        if not self.delayed_dropout_masks_update:
+            self.uncertainty_dropout_masks_update()
+        elif step_index % self.delayed_dropout_masks_update_freq:
+            self.uncertainty_dropout_masks_update()
+        else:
+            pass
+
         for post_i in range(self.n_post_action):
             # import pdb; pdb.set_trace()
             # pi_dropout_masks = self.pi_dropout_mask_generator.generate_dropout_mask()
