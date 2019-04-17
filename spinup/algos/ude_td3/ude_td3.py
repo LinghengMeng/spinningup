@@ -191,7 +191,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         elif uncertainty_method == 'gaussian_obs_sample':
             pi_unc_module = ObsSampleUncertaintyModule(act_dim, obs_dim, n_post_action,
                                                        obs_set_size, track_obs_set_unc_frequency,
-                                                       pi, x_ph,
+                                                       pi_unc, x_ph,
                                                        pi_dropout_mask_phs_unc, pi_dropout_mask_generator_unc,
                                                        logger_kwargs, sample_obs_std)
         else:
@@ -430,6 +430,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             # Update uncertainty policy to current policy
             if ep_len == max_ep_len:
                 pi_unc_module.uncertainty_policy_update(sess)
+                pi_unc_module.uncertainty_dropout_masks_update()
 
         # Step the env
         o2, r, d, _ = env.step(a)
@@ -556,13 +557,14 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
     parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--replay_size', type=int, default=int(1e6))
     parser.add_argument('--without_start_steps', action='store_true')
     parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--exp_name', type=str, default='ude_td3')
 
     parser.add_argument('--n_post_action', type=int, default=10)
     parser.add_argument('--uncertainty_method', choices=['dropout', 'gaussian_obs_sample'],
-                        default='gaussian_obs_sample')
+                        default='dropout')
     parser.add_argument('--sample_obs_std', type=float, default=1)
     parser.add_argument('--sample_action_with_dropout', action='store_true')
     parser.add_argument('--dropout_rate', type=float, default=0.1)
@@ -586,10 +588,11 @@ if __name__ == '__main__':
 
     from spinup.utils.run_utils import setup_logger_kwargs
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
-
+    # import pdb; pdb.set_trace()
     ude_td3(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
             ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
             gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+            replay_size=args.replay_size,
             without_start_steps=args.without_start_steps,
             without_delay_train=args.without_delay_train,
             n_post_action=args.n_post_action,

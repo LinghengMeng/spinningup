@@ -87,6 +87,12 @@ class DropoutUncertaintyModule(UncertaintyModule):
                          pi, x_ph,
                          pi_dropout_mask_phs, pi_dropout_mask_generator,
                          logger_kwargs, tf_var_scope_main, tf_var_scope_unc, 'dropout')
+        self.dropout_masks_set = {i:pi_dropout_mask_generator.generate_dropout_mask() for i in range(n_post_action)}
+
+    def uncertainty_dropout_masks_update(self):
+        """Update uncertainty dropout_masks."""
+        self.dropout_masks_set = {i: self.pi_dropout_mask_generator.generate_dropout_mask() for i in
+                                  range(self.n_post_action)}
 
     def get_post_samples(self, obs, sess):
         """Return a post sample matrix for an observation."""
@@ -94,9 +100,9 @@ class DropoutUncertaintyModule(UncertaintyModule):
         a_post = np.zeros((self.n_post_action, self.act_dim))
         for post_i in range(self.n_post_action):
             # import pdb; pdb.set_trace()
-            pi_dropout_masks = self.pi_dropout_mask_generator.generate_dropout_mask()
+            # pi_dropout_masks = self.pi_dropout_mask_generator.generate_dropout_mask()
             for mask_i in range(len(self.pi_dropout_mask_phs)):
-                feed_dictionary[self.pi_dropout_mask_phs[mask_i]] = pi_dropout_masks[mask_i]
+                feed_dictionary[self.pi_dropout_mask_phs[mask_i]] = self.dropout_masks_set[post_i][mask_i]
             # import pdb; pdb.set_trace()
             a_post[post_i] = sess.run(self.pi, feed_dict=feed_dictionary)[0]
         return a_post
