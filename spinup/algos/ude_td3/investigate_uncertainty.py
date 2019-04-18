@@ -56,18 +56,10 @@ class UncertaintyModule(object):
         self.uncertainty_logger.log_tabular('Epoch', epoch)
         self.uncertainty_logger.log_tabular('Step', step)
         for obs_i, obs in enumerate(self.obs_set):
-            # import pdb
-            # pdb.set_trace()
             a_post = self.get_post_samples(obs, sess, step)
             a_cov = np.cov(a_post, rowvar=False)
-            if a_post.shape[1] != 1:
-                a_unc_cov = np.sum(np.triu(a_cov))  # summation of upper triangle of an array as uncertainty
-                a_unc_var = np.sum(np.diag(a_cov))
-            else:
-                a_unc_cov = np.sum(a_cov)
-                a_unc_var = np.sum(a_cov)  # summation of upper triangle of an array as uncertainty
-            self.uncertainty_logger.log_tabular('Obs{}_cov'.format(obs_i), a_unc_cov)
-            self.uncertainty_logger.log_tabular('Obs{}_var'.format(obs_i), a_unc_var)
+            for unc_i, unc_v in enumerate(np.array(a_cov).flatten(order='C')):
+                self.uncertainty_logger.log_tabular('Obs{}_unc_{}'.format(obs_i, unc_i), unc_v)
         self.uncertainty_logger.dump_tabular(print_data=False)
 
     def get_post_samples(self, obs, sess):
