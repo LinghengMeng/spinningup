@@ -300,9 +300,10 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             a = np.zeros((act_dim,))
             if act_dim >1:
                 a_cov = np.cov(a_post, rowvar=False)
-                a_cov_shaped = concentration_factor * a_cov + minimum_exploration_level * np.ones(a_cov.shape)
+                a_cov_shaped = concentration_factor * a_cov
                 a = np.random.multivariate_normal(a_prediction, a_cov_shaped, 1)[0]
                 uncertainty = a_cov
+                # TODO: add baseline with uniform covariance matrix
             else:
                 a_std = np.std(a_post, axis=0)
                 a_std_shaped = concentration_factor * a_std + minimum_exploration_level * np.ones(a_std.shape)
@@ -490,8 +491,8 @@ if __name__ == '__main__':
     parser.add_argument('--sample_obs_std', type=float, default=1)
     parser.add_argument('--uncertainty_driven_exploration', action='store_true')
     parser.add_argument('--dropout_rate', type=float, default=0.1)
-    parser.add_argument('--uncertainty_policy_delay', type=int, default=1000)
-    parser.add_argument('--concentration_factor', type=float, default=0.5)
+    parser.add_argument('--uncertainty_policy_delay', type=int, default=5000)
+    parser.add_argument('--concentration_factor', type=float, default=0.3)
     parser.add_argument('--minimum_exploration_level', type=float, default=0)
 
     args = parser.parse_args()
