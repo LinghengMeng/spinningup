@@ -301,13 +301,16 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             if act_dim >1:
                 a_cov = np.cov(a_post, rowvar=False)
                 a_cov_shaped = concentration_factor * a_cov
+                # TODO: only keep one
                 a = np.random.multivariate_normal(a_prediction, a_cov_shaped, 1)[0]
+                a = a_prediction
                 uncertainty = a_cov
-                # TODO: add baseline with uniform covariance matrix
             else:
                 a_std = np.std(a_post, axis=0)
                 a_std_shaped = concentration_factor * a_std + minimum_exploration_level * np.ones(a_std.shape)
+                # TODO: only keep one
                 a = np.random.normal(a_prediction, a_std_shaped, 1)[0]
+                a = a_prediction
                 uncertainty = np.var(a_post, axis=0)
         else:
             for mask_i in range(len(pi_dropout_mask_phs)):
@@ -315,7 +318,9 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             a = sess.run(pi, feed_dict=feed_dictionary)[0]
             a += noise_scale * np.random.randn(act_dim)
             uncertainty = 0
-        return np.clip(a, -act_limit, act_limit), uncertainty
+        unc_based_reward = np.mean(np.abs(uncertainty))
+        # unc_based_reward = np.sum(np.abs(uncertainty))
+        return np.clip(a, -act_limit, act_limit), uncertainty, unc_based_reward
 
     def get_action_test(o):
         """Get deterministic action without exploration."""
@@ -363,7 +368,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         use the learned policy (with some noise, via act_noise). 
         """
         if t > start_steps:
-            a, uncertainty = get_action_train(o, act_noise, pi_unc_module, step_index=t)
+            a, uncertainty, unc_based_reward = get_action_train(o, act_noise, pi_unc_module, step_index=t)
         else:
             a = env.action_space.sample()
             # TODO：keep the same dimension with real covariance
@@ -371,6 +376,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
                 uncertainty = np.zeros((act_dim, act_dim))
             else:
                 uncertainty = 0
+            unc_based_reward = 0
 
         # Sample an observation set to track their uncertainty trajectories
         if t > start_steps:
@@ -396,7 +402,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        replay_buffer.store(o, a, r, o2, d, uncertainty, t, steps_per_epoch, start_time)
+        replay_buffer.store(o, a, r+unc_based_reward, o2, d, uncertainty, t, steps_per_epoch, start_time)
 
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
@@ -492,7 +498,7 @@ if __name__ == '__main__':
     parser.add_argument('--uncertainty_driven_exploration', action='store_true')
     parser.add_argument('--dropout_rate', type=float, default=0.1)
     parser.add_argument('--uncertainty_policy_delay', type=int, default=5000)
-    parser.add_argument('--concentration_factor', type=float, default=0.3)
+    parser.add_argument('--concentration_factor', type=float, default=0.5)
     parser.add_argument('--minimum_exploration_level', type=float, default=0)
 
     args = parser.parse_args()
