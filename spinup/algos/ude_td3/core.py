@@ -110,6 +110,24 @@ def count_vars(scope):
     return sum([np.prod(var.shape.as_list()) for var in v])
 
 """
+Random Network Distillation
+"""
+def random_net_distill(x_ph, a_ph,  hidden_sizes=(400,300), activation=tf.nn.relu,
+                       output_activation=tf.tanh, action_space=None):
+    act_dim = a_ph.shape.as_list()[-1]
+    act_limit = action_space.high[0]
+    with tf.variable_scope('rnd_targ_act'):
+        rnd_targ_act = act_limit * mlp(x_ph, list(hidden_sizes) + [act_dim], activation, output_activation)
+    with tf.variable_scope('rnd_pred_act'):
+        rnd_pred_act = act_limit * mlp(x_ph, list(hidden_sizes) + [act_dim], activation, output_activation)
+    with tf.variable_scope('rnd_targ_cri'):
+        rnd_targ_cri = tf.squeeze(mlp(tf.concat([x_ph, a_ph], axis=-1), list(hidden_sizes) + [1], activation, None), axis=1)
+    with tf.variable_scope('rnd_pred_cri'):
+        rnd_pred_cri = tf.squeeze(mlp(tf.concat([x_ph, a_ph], axis=-1), list(hidden_sizes) + [1], activation, None),
+                                  axis=1)
+    return rnd_targ_act, rnd_pred_act, rnd_targ_cri, rnd_pred_cri
+
+"""
 Actor-Critics
 """
 def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
