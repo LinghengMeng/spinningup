@@ -26,10 +26,16 @@ class ReplayBuffer:
         self.ptr, self.size, self.max_size = 0, 0, size
 
     def store(self, obs, act, rew, next_obs, done,
-              uncertainty, step_index, steps_per_epoch, start_time):
+              uncertainty,
+              q1_pred, q2_pred, q1_post, q2_post,
+              rnd_e_act, rnd_e_cri,
+              step_index, steps_per_epoch, start_time):
         # Save experiences in disk
         self.log_experiences(obs, act, rew, next_obs, done,
-                             uncertainty, step_index, steps_per_epoch, start_time)
+                             uncertainty,
+                             q1_pred, q2_pred, q1_post, q2_post,
+                             rnd_e_act, rnd_e_cri,
+                             step_index, steps_per_epoch, start_time)
         # Save experiences in memory
         self.obs1_buf[self.ptr] = obs
         self.obs2_buf[self.ptr] = next_obs
@@ -48,7 +54,10 @@ class ReplayBuffer:
                     done=self.done_buf[idxs])
 
     def log_experiences(self, obs, act, rew, next_obs, done,
-                        uncertainty, step_index, steps_per_epoch, start_time):
+                        uncertainty,
+                        q1_pred, q2_pred, q1_post, q2_post,
+                        rnd_e_act, rnd_e_cri,
+                        step_index, steps_per_epoch, start_time):
         self.experience_logger.log_tabular('Epoch', step_index // steps_per_epoch)
         self.experience_logger.log_tabular('Step', step_index)
         # Log observation
@@ -62,10 +71,20 @@ class ReplayBuffer:
         # Log next observation
         for i, o2_i in enumerate(next_obs):
             self.experience_logger.log_tabular('o2_{}'.format(i), o2_i)
-        # TODO: save uncertainty
         # Log uncertainty: flatten in row-major order
         for i, unc_i in enumerate(np.array(uncertainty).flatten(order='C')):
             self.experience_logger.log_tabular('unc_{}'.format(i), unc_i)
+        # Log q1_post, q2_post
+        self.experience_logger.log_tabular('q1_pred', q1_pred)
+        self.experience_logger.log_tabular('q2_pred', q2_pred)
+        # Log q1_post, q2_post
+        for i in range(len(q1_post)):
+            self.experience_logger.log_tabular('q1_post_{}'.format(i), q1_post[i])
+            self.experience_logger.log_tabular('q2_post_{}'.format(i), q2_post[i])
+        # Log RND actor prediction error
+        self.experience_logger.log_tabular('rnd_e_act', rnd_e_act)
+        # Log RND critic prediction error
+        self.experience_logger.log_tabular('rnd_e_cri', rnd_e_cri)
         # Log done
         self.experience_logger.log_tabular('d', done)
         self.experience_logger.log_tabular('Time', time.time() - start_time)
@@ -193,26 +212,40 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
     # Inputs to computation graph
     x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
+    print('Creating networks ...')
     # Main outputs from computation graph
     with tf.variable_scope('main'):
         pi, _, pi_dropout_mask_generator, pi_dropout_mask_phs, \
         q1, _, q1_dropout_mask_generator, q1_dropout_mask_phs, q1_pi, _, \
         q2, _, q2_dropout_mask_generator, q2_dropout_mask_phs = actor_critic(x_ph, a_ph, **ac_kwargs, dropout_rate=0)
 
+    # Random Network Distillation
+    with tf.variable_scope('random_net_distill'):
+        # RND Target and Predictor Network
+        rnd_lr = 1e-3
+        rnd_targ_act, rnd_pred_act, rnd_targ_cri, rnd_pred_cri = core.random_net_distill(x_ph, a_ph, **ac_kwargs)
+
+
+    # TODO: add environment model learning transition dynamics
 
     with tf.variable_scope('uncertainty'):
         pi_unc, _, pi_dropout_mask_generator_unc, pi_dropout_mask_phs_unc, \
         q1_unc, _, q1_dropout_mask_generator_unc, q1_dropout_mask_phs_unc, q1_pi_unc, _, \
         q2_unc, _, q2_dropout_mask_generator_unc, q2_dropout_mask_phs_unc = actor_critic(x_ph, a_ph, **ac_kwargs, dropout_rate=dropout_rate)
 
+        # TODO: Calculate Uncertainty of Q-value function
         # Initialize uncertainty module
         obs_set_size = 10
         track_obs_set_unc_frequency = 100  # every 100 steps
         if uncertainty_method == 'dropout':
             pi_unc_module = DropoutUncertaintyModule(act_dim, obs_dim, n_post_action,
                                                      obs_set_size, track_obs_set_unc_frequency,
-                                                     pi_unc, x_ph,
+                                                     x_ph, a_ph, pi_unc, q1_unc, q2_unc,
                                                      pi_dropout_mask_phs_unc, pi_dropout_mask_generator_unc,
+                                                     q1_dropout_mask_phs_unc, q1_dropout_mask_generator_unc,
+                                                     q2_dropout_mask_phs_unc, q2_dropout_mask_generator_unc,
+                                                     rnd_targ_act, rnd_pred_act,
+                                                     rnd_targ_cri, rnd_pred_cri,
                                                      logger_kwargs,
                                                      tf_var_scope_main='main', tf_var_scope_unc='uncertainty')
         elif uncertainty_method == 'gaussian_obs_sample':
@@ -228,7 +261,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
     with tf.variable_scope('target'):
         pi_targ, _, pi_dropout_mask_generator_targ, pi_dropout_mask_phs_targ, \
         _, _, _, _, _, _, \
-        _, _, _, _ = actor_critic(x2_ph, a_ph, **ac_kwargs, dropout_rate=0)
+        _, _, _, _ = actor_critic(x2_ph, a_ph, **ac_kwargs, dropout_rate=dropout_rate)
     
     # Target Q networks
     with tf.variable_scope('target', reuse=True):
@@ -242,7 +275,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         # Target Q-values, using action from target policy
         _, _, _, _, \
         q1_targ, _, q1_dropout_mask_generator_targ, q1_dropout_mask_phs_targ, _, _, \
-        q2_targ, _, q2_dropout_mask_generator_targ, q2_dropout_mask_phs_targ = actor_critic(x2_ph, a2, **ac_kwargs, dropout_rate=0)
+        q2_targ, _, q2_dropout_mask_generator_targ, q2_dropout_mask_phs_targ = actor_critic(x2_ph, a2, **ac_kwargs, dropout_rate=dropout_rate)
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size,
@@ -252,7 +285,28 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
     var_counts = tuple(core.count_vars(scope) for scope in ['main/pi', 'main/q1', 'main/q2', 'main'])
     print('\nNumber of parameters: \t pi: %d, \t q1: %d, \t q2: %d, \t total: %d\n'%var_counts)
 
+    # TODO: use conservative estimation of Q
     # Bellman backup for Q functions, using Clipped Double-Q targets
+    def post_sample_q1_and_q2(feed_dictionary, batch_size):
+        dropout_masks_set_q1 = {i: q1_dropout_mask_generator_targ.generate_dropout_mask() for i in
+                                range(n_post_action)}
+        dropout_masks_set_q2 = {i: q2_dropout_mask_generator_targ.generate_dropout_mask() for i in
+                                range(n_post_action)}
+        q1_targ_post = np.zeros((batch_size, n_post_action))
+        q2_targ_post = np.zeros((batch_size, n_post_action))
+        for post_i in range(n_post_action):
+            # Post sampled q
+            for mask_i in range(len(q1_dropout_mask_phs_targ)):
+                feed_dictionary[q1_dropout_mask_phs_targ[mask_i]] = dropout_masks_set_q1[post_i][mask_i]
+                feed_dictionary[q2_dropout_mask_phs_targ[mask_i]] = dropout_masks_set_q2[post_i][mask_i]
+            q1_targ_post[:, post_i] = sess.run(q1_targ, feed_dict=feed_dictionary)
+            q2_targ_post[:, post_i] = sess.run(q2_targ, feed_dict=feed_dictionary)
+        min_q_targ = np.minimum(q1_targ_post.min(axis=1), q2_targ_post.min(axis=1))
+        return min_q_targ
+
+    min_q_targ = tf.placeholder(dtype=tf.float32)
+    backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*min_q_targ)
+
     min_q_targ = tf.minimum(q1_targ, q2_targ)
     backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*min_q_targ)
 
@@ -267,6 +321,17 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
     q_optimizer = tf.train.AdamOptimizer(learning_rate=q_lr)
     train_pi_op = pi_optimizer.minimize(pi_loss, var_list=get_vars('main/pi'))
     train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('main/q'))
+
+    # RND losses and train ops
+    rnd_loss_act = tf.reduce_mean((rnd_pred_act - rnd_targ_act)**2)
+    rnd_optimizer_act = tf.train.AdamOptimizer(learning_rate=rnd_lr)
+    train_rnd_op_act = rnd_optimizer_act.minimize(rnd_loss_act,
+                                                  var_list=get_vars('random_net_distill/rnd_pred_act'))
+
+    rnd_loss_cri = tf.reduce_mean((rnd_pred_cri - rnd_targ_cri)**2)
+    rnd_optimizer_cri = tf.train.AdamOptimizer(learning_rate=rnd_lr)
+    train_rnd_op_cri = rnd_optimizer_cri.minimize(rnd_loss_cri,
+                                                  var_list=get_vars('random_net_distill/rnd_pred_cri'))
 
     # Polyak averaging for target variables
     target_update = tf.group([tf.assign(v_targ, polyak*v_targ + (1-polyak)*v_main)
@@ -287,30 +352,39 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
     def get_action_train(o, noise_scale, pi_unc_module, step_index):
         feed_dictionary = {x_ph: o.reshape(1, -1)}
         if uncertainty_driven_exploration:
-            # 1. Generate Prediction
+            # 1. Generate action Prediction, and q1 and q2 prediction
             for mask_i in range(len(pi_dropout_mask_phs)):
                 feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_dropout_mask_phs[mask_i].shape.as_list())
             a_prediction = sess.run(pi, feed_dict=feed_dictionary)[0]
 
+            for mask_i in range(len(q1_dropout_mask_phs)):
+                feed_dictionary[q1_dropout_mask_phs[mask_i]] = np.ones(q1_dropout_mask_phs[mask_i].shape.as_list())
+                feed_dictionary[q2_dropout_mask_phs[mask_i]] = np.ones(q2_dropout_mask_phs[mask_i].shape.as_list())
+            feed_dictionary[a_ph] = a_prediction.reshape(1,-1)
+            q1_pred = sess.run(q1, feed_dict=feed_dictionary)[0]
+            q2_pred = sess.run(q2, feed_dict=feed_dictionary)[0]
             # 2. Generate post samples in Non-parallel way
             #    (Tried to use ray implementing parallel post sampling but no speed up in one machine.)
             a_post = pi_unc_module.get_post_samples(o, sess, step_index)
+
+            q1_post, q2_post = pi_unc_module.get_post_samples_q(o, a_prediction, sess, step_index)
 
             # 3. Generate uncertainty-driven exploratory action
             a = np.zeros((act_dim,))
             if act_dim >1:
                 a_cov = np.cov(a_post, rowvar=False)
                 a_cov_shaped = concentration_factor * a_cov
+                # TODO: use RND error as concentration factor
                 # TODO: only keep one
-                a = np.random.multivariate_normal(a_prediction, a_cov_shaped, 1)[0]
-                a = a_prediction
+                # a = np.random.multivariate_normal(a_prediction, a_cov_shaped, 1)[0]
+                a = a_prediction + noise_scale * np.random.randn(act_dim)
                 uncertainty = a_cov
             else:
                 a_std = np.std(a_post, axis=0)
                 a_std_shaped = concentration_factor * a_std + minimum_exploration_level * np.ones(a_std.shape)
                 # TODO: only keep one
-                a = np.random.normal(a_prediction, a_std_shaped, 1)[0]
-                a = a_prediction
+                # a = np.random.normal(a_prediction, a_std_shaped, 1)[0]
+                a = a_prediction + noise_scale * np.random.randn(act_dim)
                 uncertainty = np.var(a_post, axis=0)
         else:
             for mask_i in range(len(pi_dropout_mask_phs)):
@@ -318,9 +392,19 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             a = sess.run(pi, feed_dict=feed_dictionary)[0]
             a += noise_scale * np.random.randn(act_dim)
             uncertainty = 0
+            q1_post = 0
+            q2_post = 0
+
+        a = np.clip(a, -act_limit, act_limit)
+        # TODO: save full q1 and q2
         unc_based_reward = np.mean(np.abs(uncertainty))
-        # unc_based_reward = np.sum(np.abs(uncertainty))
-        return np.clip(a, -act_limit, act_limit), uncertainty, unc_based_reward
+        rnd_t_act, rnd_p_act, rnd_e_act = pi_unc_module.calculate_actor_RND_pred_error(o, sess)
+        rnd_t_cri, rnd_p_cri, rnd_e_cri = pi_unc_module.calculate_critic_RND_pred_error(o, a, sess)
+        return a, \
+               q1_pred, q2_pred, q1_post, q2_post,\
+               uncertainty, unc_based_reward, \
+               rnd_t_act, rnd_p_act, rnd_e_act,\
+               rnd_t_cri, rnd_p_cri, rnd_e_cri
 
     def get_action_test(o):
         """Get deterministic action without exploration."""
@@ -341,7 +425,8 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
     start_time = time.time()
-    o, r, d, ep_ret, ep_len, ep_uncertainty = env.reset(), 0, False, 0, 0, 0
+    o, r, d, ep_ret, ep_len, ep_q1_var, ep_q2_var,\
+    ep_uncertainty, ep_rnd_e_act, ep_rnd_e_cri = env.reset(), 0, False, 0, 0, 0, 0, 0, 0, 0
     total_steps = steps_per_epoch * epochs
 
     # No dropout for training phase: set all dropout masks to one
@@ -368,7 +453,11 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         use the learned policy (with some noise, via act_noise). 
         """
         if t > start_steps:
-            a, uncertainty, unc_based_reward = get_action_train(o, act_noise, pi_unc_module, step_index=t)
+            a, \
+            q1_pred, q2_pred, q1_post, q2_post,\
+            uncertainty, unc_based_reward, \
+            rnd_t_act, rnd_p_act, rnd_e_act,\
+            rnd_t_cri, rnd_p_cri, rnd_e_cri = get_action_train(o, act_noise, pi_unc_module, step_index=t)
         else:
             a = env.action_space.sample()
             # TODO：keep the same dimension with real covariance
@@ -376,7 +465,11 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
                 uncertainty = np.zeros((act_dim, act_dim))
             else:
                 uncertainty = 0
+            q1_pred, q2_pred = 0, 0
+            q1_post = np.zeros((n_post_action,))
+            q2_post = np.zeros((n_post_action,))
             unc_based_reward = 0
+            rnd_t_act, rnd_p_act, rnd_e_act, rnd_t_cri, rnd_p_cri, rnd_e_cri = 0, 0, 0, 0, 0, 0
 
         # Sample an observation set to track their uncertainty trajectories
         if t > start_steps:
@@ -394,7 +487,11 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         o2, r, d, _ = env.step(a)
         ep_ret += r
         ep_len += 1
+        ep_q1_var += np.var(q1_post)
+        ep_q2_var += np.var(q2_post)
         ep_uncertainty += np.sum(uncertainty)
+        ep_rnd_e_act += rnd_e_act
+        ep_rnd_e_cri += rnd_e_cri
 
         # Ignore the "done" signal if it comes from hitting the time
         # horizon (that is, when it's an artificial terminal signal
@@ -402,7 +499,10 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        replay_buffer.store(o, a, r+unc_based_reward, o2, d, uncertainty, t, steps_per_epoch, start_time)
+        replay_buffer.store(o, a, r, o2, d, uncertainty,
+                            q1_pred, q2_pred, q1_post, q2_post,
+                            rnd_e_act, rnd_e_cri, t, steps_per_epoch, start_time)
+        # replay_buffer.store(o, a, r + unc_based_reward, o2, d, uncertainty, t, steps_per_epoch, start_time)
 
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
@@ -415,6 +515,13 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             feed_dict_train[a_ph] = batch['acts']
             feed_dict_train[r_ph] = batch['rews']
             feed_dict_train[d_ph] = batch['done']
+
+            # Train Random Net Distillation
+            rnd_step_ops_act = [rnd_loss_act, rnd_targ_act, rnd_pred_act, train_rnd_op_act]
+            rnd_outs_act = sess.run(rnd_step_ops_act, feed_dict_train)
+            logger.store(LossRnd=rnd_outs_act[0])
+
+            # Train q
             q_step_ops = [q_loss, q1, q2, train_q_op]
             outs = sess.run(q_step_ops, feed_dict_train)
             logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2])
@@ -438,6 +545,18 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
                     feed_dict_train[r_ph] = batch['rews']
                     feed_dict_train[d_ph] = batch['done']
 
+                    # Train Random Net Distillation
+                    rnd_step_ops_act = [rnd_loss_act, rnd_targ_act, rnd_pred_act, train_rnd_op_act]
+                    rnd_outs_act = sess.run(rnd_step_ops_act, feed_dict_train)
+                    logger.store(LossRndAct=rnd_outs_act[0])
+
+                    rnd_step_ops_cri = [rnd_loss_cri, rnd_targ_cri, rnd_pred_cri, train_rnd_op_cri]
+                    rnd_outs_cri = sess.run(rnd_step_ops_cri, feed_dict_train)
+                    logger.store(LossRndCri=rnd_outs_cri[0])
+
+                    # Train Q-value function
+                    # import pdb; pdb.set_trace()
+                    feed_dict_train[min_q_targ] = post_sample_q1_and_q2(feed_dict_train, batch_size)
                     q_step_ops = [q_loss, q1, q2, train_q_op]
                     outs = sess.run(q_step_ops, feed_dict_train)
                     logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2])
@@ -448,8 +567,11 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
                         logger.store(LossPi=outs[0])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len,
-                         EpUncertainty=ep_uncertainty)
-            o, r, d, ep_ret, ep_len, ep_uncertainty = env.reset(), 0, False, 0, 0, 0
+                         EpQ1Var=ep_q1_var, EpQ2Var=ep_q2_var,
+                         EpUncertainty=ep_uncertainty,
+                         EpRndErrorAct=ep_rnd_e_act, EpRndErrorCri=ep_rnd_e_cri)
+            o, r, d, ep_ret, ep_len, ep_q1_var, ep_q2_var,\
+            ep_uncertainty, ep_rnd_e_act, ep_rnd_e_cri = env.reset(), 0, False, 0, 0, 0, 0, 0, 0, 0
 
         # End of epoch wrap-up
         if t > 0 and t % steps_per_epoch == 0:
@@ -473,7 +595,13 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             logger.log_tabular('Q2Vals', with_min_and_max=True)
             logger.log_tabular('LossPi', average_only=True)
             logger.log_tabular('LossQ', average_only=True)
+            logger.log_tabular('LossRndAct', average_only=True)
+            logger.log_tabular('LossRndCri', average_only=True)
+            logger.log_tabular('EpQ1Var', with_min_and_max=True)
+            logger.log_tabular('EpQ2Var', with_min_and_max=True)
             logger.log_tabular('EpUncertainty', with_min_and_max=True)
+            logger.log_tabular('EpRndErrorAct', with_min_and_max=True)
+            logger.log_tabular('EpRndErrorCri', with_min_and_max=True)
             logger.log_tabular('Time', time.time()-start_time)
             logger.dump_tabular()
 
@@ -506,7 +634,7 @@ if __name__ == '__main__':
     from spinup.utils.run_utils import setup_logger_kwargs
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
     # import pdb; pdb.set_trace()
-    ude_td3(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
+    ude_td3(lambda: gym.make(args.env), actor_critic=core.mlp_actor_critic,
             ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
             gamma=args.gamma, seed=args.seed, epochs=args.epochs,
             replay_size=args.replay_size,
