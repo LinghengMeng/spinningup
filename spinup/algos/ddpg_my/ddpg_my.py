@@ -5,6 +5,7 @@ import time
 from spinup.algos.ddpg_my import core
 from spinup.algos.ddpg_my.core import get_vars
 from spinup.utils.logx import EpochLogger
+import os.path as osp
 
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -310,7 +311,8 @@ if __name__ == '__main__':
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
     parser.add_argument('--hid', type=int, default=300)
     parser.add_argument('--l', type=int, default=2)
-    parser.add_argument('--nn_type', choices=['tf_dense', 'simple_dense', 'variational_dense'], default='simple_dense')
+    parser.add_argument('--nn_type', choices=['tf_dense', 'simple_dense', 'variational_dense'],
+                        default='simple_dense')
     parser.add_argument('--without_start_steps', action='store_true')
 
     parser.add_argument('--gamma', type=float, default=0.99)
@@ -330,8 +332,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
+    data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
+                        'spinup_data')
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
 
     # if args.hardcopy_target_nn:
     #     polyak = 0

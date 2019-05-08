@@ -338,16 +338,21 @@ if __name__ == '__main__':
     parser.add_argument('--without_start_steps', action='store_true')
     parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--exp_name', type=str, default='td3_one_layer')
+    parser.add_argument('--act_noise', type=float, default=0.1)
     args = parser.parse_args()
 
+    # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
+    data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
+                        'spinup_data')
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
     
     td3(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
         without_start_steps=args.without_start_steps,
         without_delay_train=args.without_delay_train,
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+        act_noise=args.act_noise,
         logger_kwargs=logger_kwargs)
 
 # python ./spinup/algos/td3/td3.py --env HalfCheetah-v2 --seed 3 --l 2 --exp_name td3_two_layers

@@ -4,8 +4,8 @@ import gym
 import time
 from spinup.algos.vd3_delayed_dropout import core
 from spinup.algos.vd3_delayed_dropout.core import get_vars
-from spinup.algos.vd3_delayed_dropout.investigate_uncertainty import UncertaintyModule
-from spinup.utils.logx import EpochLogger
+from spinup.algos.vd3_delayed_dropout.investigate_uncertainty import DropoutUncertaintyModule,ObsSampleUncertaintyModule
+from spinup.utils.logx import EpochLogger, Logger
 from multiprocessing import Pool
 
 class ReplayBuffer:
@@ -50,7 +50,7 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
                         without_delay_train=True,
                         batch_size=100, start_steps=10000,
                         act_noise=0.1, target_noise=0.2, noise_clip=0.5,
-                        n_post_q=1, n_post_action = 10,
+                        n_post_q=1, n_post_action = 10, uncertainty_method='dropout',
                         sample_action_with_dropout = True, dropout_rate=0.1,
                         action_choose_method = 'random_sample',
                         uncertainty_noise_type = 'std_noise',
@@ -142,8 +142,11 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
     if without_start_steps:
         start_steps = batch_size
 
+    # EpochLogger: save epoch info
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
+    # ExperienceLogger: save experiences for supervised learning
+    experience_logger = Logger(output_fname='experiences.txt', **logger_kwargs)
 
     tf.set_random_seed(seed)
     np.random.seed(seed)
@@ -167,18 +170,36 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
         q, q_reg, q_dropout_mask_generator, q_dropout_mask_phs,\
         q_pi, q_pi_reg = actor_critic(x_ph, a_ph, **ac_kwargs, dropout_rate=dropout_rate)
 
+        # TODO: calculate uncertainty based on target policy
         # Initialize uncertainty module
         obs_set_size = 10
         track_obs_set_unc_frequency = 100 # every 100 steps
-        pi_unc_module = UncertaintyModule(act_dim, n_post_action,
-                                          obs_set_size, track_obs_set_unc_frequency,
-                                          pi, x_ph, pi_dropout_mask_phs, pi_dropout_mask_generator,
-                                          logger_kwargs)
+        if uncertainty_method == 'dropout':
+            pi_unc_module = DropoutUncertaintyModule(act_dim, obs_dim, n_post_action,
+                                                     obs_set_size, track_obs_set_unc_frequency,
+                                                     pi, x_ph, pi_dropout_mask_phs, pi_dropout_mask_generator,
+                                                     logger_kwargs)
+        elif uncertainty_method == 'gaussian_obs_sample':
+            pi_unc_module = ObsSampleUncertaintyModule(act_dim, obs_dim, n_post_action,
+                                                       obs_set_size, track_obs_set_unc_frequency,
+                                                       pi, x_ph, pi_dropout_mask_phs, pi_dropout_mask_generator,
+                                                       logger_kwargs)
+        else:
+            raise ValueError('Please choose a proper uncertainty_method!')
 
     # Target policy network
     with tf.variable_scope('target'):
         pi_targ, _, pi_targ_dropout_mask_generator, pi_dropout_mask_phs_targ, \
         _, _, _, _, _, _ = actor_critic(x2_ph, a_ph, **ac_kwargs, dropout_rate=dropout_rate)
+
+        # # Initialize uncertainty module
+        # obs_set_size = 10
+        # track_obs_set_unc_frequency = 100  # every 100 steps
+        # pi_unc_module = DropoutUncertaintyModule(act_dim, obs_dim, n_post_action,
+        #                                          obs_set_size, track_obs_set_unc_frequency,
+        #                                          pi_targ, x2_ph,
+        #                                          pi_dropout_mask_phs_targ, pi_targ_dropout_mask_generator,
+        #                                          logger_kwargs)
 
     # Target Q networks
     with tf.variable_scope('target', reuse=True):
@@ -192,7 +213,7 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
             a2 = pi_targ
 
         # Target Q-values, using action from target policy
-        _, _, _, _, \
+        _, _, _, pi_dropout_mask_phs_targ2, \
         q_targ, _, q_targ_dropout_mask_generator, q_dropout_mask_phs_targ, q_pi_targ, _ = actor_critic(x2_ph, a2, **ac_kwargs, dropout_rate=0)
 
     # Experience buffer
@@ -250,6 +271,7 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
             # TODO: Tried to use ray implementing parallel post sampling but no speed up in one machine.
             # Non-parallel post sample
             a_post = pi_unc_module.get_post_samples(o, sess)
+            # import pdb; pdb.set_trace()
             # a_post = np.zeros((n_post_action, act_dim))
             # for post_i in range(n_post_action):
             #     # import pdb; pdb.set_trace()
@@ -309,15 +331,20 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
                 a_prediction = sess.run(pi, feed_dict=feed_dictionary)[0]
                 a = a_prediction + noise
             elif action_choose_method == 'gaussian_sample_with_scaling_and_lower_bound':
-                a_cov = np.cov(a_post,rowvar=False)
                 # TODO: store this covariance for investigate
-                a_cov_shaped = concentration_factor * a_cov + minimum_exploration_level * np.ones(a_cov.shape)
                 # a = np.random.multivariate_normal(a_mean, a_cov_shaped, 1)[0]
                 # a = np.random.multivariate_normal(a_median, a_cov_shaped, 1)[0]
                 for mask_i in range(len(pi_dropout_mask_phs)):
                     feed_dictionary[pi_dropout_mask_phs[mask_i]] = np.ones(pi_dropout_mask_phs[mask_i].shape.as_list())
                 a_prediction = sess.run(pi, feed_dict=feed_dictionary)[0]
-                a = np.random.multivariate_normal(a_prediction, a_cov_shaped, 1)[0]
+
+                if act_dim >1:
+                    a_cov = np.cov(a_post, rowvar=False)
+                    a_cov_shaped = concentration_factor * a_cov + minimum_exploration_level * np.ones(a_cov.shape)
+                    a = np.random.multivariate_normal(a_prediction, a_cov_shaped, 1)[0]
+                else:
+                    a_var_shaped = concentration_factor * a_var + minimum_exploration_level * np.ones(a_var.shape)
+                    a = np.random.normal(a_prediction, a_var_shaped, 1)[0]
             else:
                 pass
         else:
@@ -408,6 +435,24 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
         # Store experience to replay buffer
         replay_buffer.store(o, a, r, o2, d)
 
+        # Save experience
+        def log_experiences(o, a, r, o2, d, t, steps_per_epoch, start_time):
+            experience_logger.log_tabular('Epoch', t // steps_per_epoch)
+            experience_logger.log_tabular('Step', t)
+            for i, o_i in enumerate(o):
+                experience_logger.log_tabular('o_{}'.format(i), o_i)
+            for i, a_i in enumerate(a):
+                experience_logger.log_tabular('a_{}'.format(i), a_i)
+            experience_logger.log_tabular('r', r)
+            for i, o2_i in enumerate(o2):
+                experience_logger.log_tabular('o2_{}'.format(i), o2_i)
+            experience_logger.log_tabular('d', d)
+            experience_logger.log_tabular('Time', time.time() - start_time)
+            experience_logger.dump_tabular(print_data=False)
+
+        log_experiences(o, a, r, o2, d, t, steps_per_epoch, start_time)
+        #import pdb; pdb.set_trace()
+
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
         o = o2
@@ -469,6 +514,7 @@ def vd3_delayed_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=di
 
                     # TODO: estimate uncertainty of q-value.
                     #   Run q nn multiple times
+                    # TODO： here might be a bug that q_targ should be q_pi_targ for backup value
                     q_post = np.zeros((batch_size, n_post_q))
                     for i in range(n_post_q):
                         q_post[:, i] = sess.run(q_targ, feed_dict_train)
@@ -532,10 +578,13 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--exp_name', type=str, default='vd3')
     parser.add_argument('--without_start_steps', action='store_true')
+    parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--batch_size', type=float, default=100)
 
     parser.add_argument('--n_post_action', type=int, default=10)
+    parser.add_argument('--uncertainty_method', choices=['dropout','gaussian_obs_sample'],
+                        default='gaussian_obs_sample')
     parser.add_argument('--sample_action_with_dropout', action='store_true')
     parser.add_argument('--dropout_rate', type=float, default=0.1)
     parser.add_argument('--action_choose_method', choices=['random_sample',
@@ -569,9 +618,11 @@ if __name__ == '__main__':
                         ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
                         gamma=args.gamma,
                         without_start_steps=args.without_start_steps,
+                        start_steps=args.start_steps,
                         without_delay_train=args.without_delay_train,
                         batch_size=args.batch_size, seed=args.seed, epochs=args.epochs,
                         n_post_action = args.n_post_action,
+                        uncertainty_method = args.uncertainty_method,
                         sample_action_with_dropout=args.sample_action_with_dropout,
                         dropout_rate=args.dropout_rate,
                         action_choose_method=args.action_choose_method,

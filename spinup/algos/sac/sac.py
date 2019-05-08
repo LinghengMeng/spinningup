@@ -5,7 +5,7 @@ import time
 from spinup.algos.sac import core
 from spinup.algos.sac.core import get_vars
 from spinup.utils.logx import EpochLogger
-
+import os.path as osp
 
 class ReplayBuffer:
     """
@@ -319,15 +319,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
     parser.add_argument('--hid', type=int, default=300)
-    parser.add_argument('--l', type=int, default=1)
+    parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--epochs', type=int, default=50)
-    parser.add_argument('--exp_name', type=str, default='sac')
+    parser.add_argument('--seed', '-s', type=int, default=3)
+    parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--exp_name', type=str, default='sac_2L_200Ep')
     args = parser.parse_args()
 
+    # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed)
+    data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
+                        'spinup_data')
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
 
     sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),

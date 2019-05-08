@@ -5,6 +5,7 @@ import time
 from spinup.algos.ddpg import core
 from spinup.algos.ddpg.core import get_vars
 from spinup.utils.logx import EpochLogger
+import os.path as osp
 
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -289,7 +290,7 @@ if __name__ == '__main__':
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--exp_name', type=str, default='ddpg')
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
 
@@ -303,8 +304,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
+    data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
+                        'spinup_data')
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
 
     # if args.hardcopy_target_nn:
     #     polyak = 0

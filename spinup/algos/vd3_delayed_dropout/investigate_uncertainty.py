@@ -2,13 +2,15 @@ from spinup.utils.logx import Logger
 import numpy as np
 
 class UncertaintyModule(object):
-    """This class is to provide functions to investigate uncertainty change trajectories."""
-    def __init__(self, act_dim, n_post_action,
+    """This class is to provide functions to investigate dropout-based uncertainty change trajectories."""
+
+    def __init__(self, act_dim, obs_dim, n_post_action,
                  obs_set_size, track_obs_set_unc_frequency,
                  pi, x_ph,
                  pi_dropout_mask_phs, pi_dropout_mask_generator,
-                 logger_kwargs):
+                 logger_kwargs, uncertainty_type='dropout'):
         self.act_dim = act_dim
+        self.obs_dim = obs_dim
         self.n_post_action = n_post_action
         # policy
         self.pi = pi
@@ -21,8 +23,10 @@ class UncertaintyModule(object):
         self.obs_set_is_empty = True
         self.track_obs_set_unc_frequency = track_obs_set_unc_frequency
 
-        self.uncertainty_logger = Logger(output_fname='uncertainty.txt', **logger_kwargs)
-        self.sample_logger = Logger(output_fname='sample_observation.txt', **logger_kwargs)
+        self.uncertainty_logger = Logger(output_fname='{}_uncertainty.txt'.format(uncertainty_type),
+                                         **logger_kwargs)
+        self.sample_logger = Logger(output_fname='{}_sample_observation.txt'.format(uncertainty_type),
+                                    **logger_kwargs)
 
     def sample_obs_set_from_replay_buffer(self, replay_buffer):
         """Sample an obs set from replay buffer."""
@@ -36,7 +40,7 @@ class UncertaintyModule(object):
                 self.sample_logger.log_tabular('o_{}'.format(dim), o_i)
             self.sample_logger.dump_tabular(print_data=False)
 
-    def calculate_obs_set_uncertainty(self, sess,epoch, step):
+    def calculate_obs_set_uncertainty(self, sess, epoch, step):
         self.uncertainty_logger.log_tabular('Epoch', epoch)
         self.uncertainty_logger.log_tabular('Step', step)
         for obs_i, obs in enumerate(self.obs_set):
@@ -56,6 +60,24 @@ class UncertaintyModule(object):
 
     def get_post_samples(self, obs, sess):
         """Return a post sample matrix for an observation."""
+        return np.zeros(self.n_post_action, self.act_dim)
+
+class DropoutUncertaintyModule(UncertaintyModule):
+    """This class is to provide functions to investigate dropout-based uncertainty change trajectories."""
+    def __init__(self, act_dim, obs_dim, n_post_action,
+                 obs_set_size, track_obs_set_unc_frequency,
+                 pi, x_ph,
+                 pi_dropout_mask_phs, pi_dropout_mask_generator,
+                 logger_kwargs, logger_name='dropout'):
+        super().__init__(act_dim, obs_dim, n_post_action,
+                         obs_set_size, track_obs_set_unc_frequency,
+                         pi, x_ph,
+                         pi_dropout_mask_phs, pi_dropout_mask_generator,
+                         logger_kwargs, logger_name)
+
+
+    def get_post_samples(self, obs, sess):
+        """Return a post sample matrix for an observation."""
         feed_dictionary = {self.x_ph: obs.reshape(1, -1)}
         a_post = np.zeros((self.n_post_action, self.act_dim))
         for post_i in range(self.n_post_action):
@@ -66,3 +88,38 @@ class UncertaintyModule(object):
             # import pdb; pdb.set_trace()
             a_post[post_i] = sess.run(self.pi, feed_dict=feed_dictionary)[0]
         return a_post
+
+class ObsSampleUncertaintyModule(UncertaintyModule):
+    """Class for investigating state-sampling-based uncertainty estimation."""
+    def __init__(self, act_dim, obs_dim, n_post_action,
+                 obs_set_size, track_obs_set_unc_frequency,
+                 pi, x_ph,
+                 pi_dropout_mask_phs, pi_dropout_mask_generator,
+                 logger_kwargs, logger_name='obs_sample'):
+        super().__init__(act_dim, obs_dim, n_post_action,
+                         obs_set_size, track_obs_set_unc_frequency,
+                         pi, x_ph,
+                         pi_dropout_mask_phs, pi_dropout_mask_generator,
+                         logger_kwargs, logger_name)
+
+    def get_post_samples(self, obs, sess):
+        """Return a post sample matrix for an observation."""
+        feed_dictionary = {}
+        for mask_i in range(len(self.pi_dropout_mask_phs)):
+            feed_dictionary[self.pi_dropout_mask_phs[mask_i]] = np.ones(self.pi_dropout_mask_phs[mask_i].shape.as_list())
+
+        # Sample states
+        sample_obs_std = 0.5
+        if self.act_dim == 1:
+            feed_dictionary[self.x_ph] = np.random.normal(obs,
+                                                          sample_obs_std,
+                                                          size=(self.n_post_action,self.obs_dim))
+        else:
+            feed_dictionary[self.x_ph] = np.random.multivariate_normal(obs,
+                                                                       sample_obs_std*np.identity(self.obs_dim),
+                                                                       self.n_post_action)
+            # import pdb; pdb.set_trace()
+        a_post = sess.run(self.pi, feed_dict=feed_dictionary)
+        return a_post
+
+

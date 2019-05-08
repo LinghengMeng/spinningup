@@ -95,9 +95,10 @@ class ReplayBuffer:
 UDE-TD3 (Uncertainty Driven Exploration Twin Delayed DDPG)
 
 """
-def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
+def ude_td3(env_fn, render_env=False, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99,
             polyak=0.995, pi_lr=1e-3, q_lr=1e-3,
+            reward_scale=5,
             without_start_steps=True, batch_size=100, start_steps=10000,
             without_delay_train=False,
             act_noise=0.1, target_noise=0.2, noise_clip=0.5, policy_delay=2,
@@ -247,7 +248,8 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
                                                      rnd_targ_act, rnd_pred_act,
                                                      rnd_targ_cri, rnd_pred_cri,
                                                      logger_kwargs,
-                                                     tf_var_scope_main='main', tf_var_scope_unc='uncertainty')
+                                                     tf_var_scope_main='main',
+                                                     tf_var_scope_target='target', tf_var_scope_unc='uncertainty')
         elif uncertainty_method == 'gaussian_obs_sample':
             pi_unc_module = ObsSampleUncertaintyModule(act_dim, obs_dim, n_post_action,
                                                        obs_set_size, track_obs_set_unc_frequency,
@@ -301,11 +303,11 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
                 feed_dictionary[q2_dropout_mask_phs_targ[mask_i]] = dropout_masks_set_q2[post_i][mask_i]
             q1_targ_post[:, post_i] = sess.run(q1_targ, feed_dict=feed_dictionary)
             q2_targ_post[:, post_i] = sess.run(q2_targ, feed_dict=feed_dictionary)
-        min_q_targ = np.minimum(q1_targ_post.min(axis=1), q2_targ_post.min(axis=1))
+        min_q_targ = np.minimum(q1_targ_post.mean(axis=1), q2_targ_post.mean(axis=1))
         return min_q_targ
 
-    min_q_targ = tf.placeholder(dtype=tf.float32)
-    backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*min_q_targ)
+    # min_q_targ = tf.placeholder(dtype=tf.float32)
+    # backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*min_q_targ)
 
     min_q_targ = tf.minimum(q1_targ, q2_targ)
     backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*min_q_targ)
@@ -350,6 +352,9 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
     logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q1': q1, 'q2': q2})
 
     def get_action_train(o, noise_scale, pi_unc_module, step_index):
+        # RND actor
+        rnd_t_act, rnd_p_act, rnd_e_act = pi_unc_module.calculate_actor_RND_pred_error(o, sess)
+        # Generate action
         feed_dictionary = {x_ph: o.reshape(1, -1)}
         if uncertainty_driven_exploration:
             # 1. Generate action Prediction, and q1 and q2 prediction
@@ -365,6 +370,8 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             q2_pred = sess.run(q2, feed_dict=feed_dictionary)[0]
             # 2. Generate post samples in Non-parallel way
             #    (Tried to use ray implementing parallel post sampling but no speed up in one machine.)
+            # TODO: generate a batch of dropout mask and multiply with weights to get a set
+            #   of post sampled action in one see.run() to speed up sampling.
             a_post = pi_unc_module.get_post_samples(o, sess, step_index)
 
             q1_post, q2_post = pi_unc_module.get_post_samples_q(o, a_prediction, sess, step_index)
@@ -372,19 +379,32 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             # 3. Generate uncertainty-driven exploratory action
             a = np.zeros((act_dim,))
             if act_dim >1:
+                # TODO: compute correlation rather than covariance
                 a_cov = np.cov(a_post, rowvar=False)
                 a_cov_shaped = concentration_factor * a_cov
-                # TODO: use RND error as concentration factor
+                # a = np.random.multivariate_normal(a_prediction, a_cov_shaped, 1)[0]
+
+                a_corr = np.corrcoef(a_post, rowvar=False)
+                a_corr[np.isnan(a_corr)] = 1
+                np.fill_diagonal(a_corr, concentration_factor * np.ones(act_dim))
+                # a_corr_shaped = concentration_factor * a_corr
+                if np.sum(np.isnan(a_corr)) != 0:
+                    import pdb
+                    pdb.set_trace()
+                a = np.random.multivariate_normal(a_prediction, a_corr)
+                # import pdb; pdb.set_trace()
+
                 # TODO: only keep one
                 # a = np.random.multivariate_normal(a_prediction, a_cov_shaped, 1)[0]
-                a = a_prediction + noise_scale * np.random.randn(act_dim)
-                uncertainty = a_cov
+                # a = a_prediction + noise_scale * np.random.randn(act_dim)
+                # uncertainty = a_cov
+                uncertainty = a_corr
             else:
                 a_std = np.std(a_post, axis=0)
                 a_std_shaped = concentration_factor * a_std + minimum_exploration_level * np.ones(a_std.shape)
                 # TODO: only keep one
                 # a = np.random.normal(a_prediction, a_std_shaped, 1)[0]
-                a = a_prediction + noise_scale * np.random.randn(act_dim)
+                # a = a_prediction + noise_scale * np.random.randn(act_dim)
                 uncertainty = np.var(a_post, axis=0)
         else:
             for mask_i in range(len(pi_dropout_mask_phs)):
@@ -396,9 +416,8 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
             q2_post = 0
 
         a = np.clip(a, -act_limit, act_limit)
-        # TODO: save full q1 and q2
         unc_based_reward = np.mean(np.abs(uncertainty))
-        rnd_t_act, rnd_p_act, rnd_e_act = pi_unc_module.calculate_actor_RND_pred_error(o, sess)
+        # RND critic
         rnd_t_cri, rnd_p_cri, rnd_e_cri = pi_unc_module.calculate_critic_RND_pred_error(o, a, sess)
         return a, \
                q1_pred, q2_pred, q1_post, q2_post,\
@@ -484,6 +503,8 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
                 pi_unc_module.uncertainty_policy_update(sess)
 
         # Step the env
+        if render_env:
+            env.render()
         o2, r, d, _ = env.step(a)
         ep_ret += r
         ep_len += 1
@@ -499,7 +520,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        replay_buffer.store(o, a, r, o2, d, uncertainty,
+        replay_buffer.store(o, a, reward_scale*r, o2, d, uncertainty,
                             q1_pred, q2_pred, q1_post, q2_post,
                             rnd_e_act, rnd_e_cri, t, steps_per_epoch, start_time)
         # replay_buffer.store(o, a, r + unc_based_reward, o2, d, uncertainty, t, steps_per_epoch, start_time)
@@ -555,8 +576,7 @@ def ude_td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0
                     logger.store(LossRndCri=rnd_outs_cri[0])
 
                     # Train Q-value function
-                    # import pdb; pdb.set_trace()
-                    feed_dict_train[min_q_targ] = post_sample_q1_and_q2(feed_dict_train, batch_size)
+                    # feed_dict_train[min_q_targ] = post_sample_q1_and_q2(feed_dict_train, batch_size)
                     q_step_ops = [q_loss, q1, q2, train_q_op]
                     outs = sess.run(q_step_ops, feed_dict_train)
                     logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2])
@@ -609,12 +629,14 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
+    parser.add_argument('--render_env', action='store_true')
     parser.add_argument('--hid', type=int, default=300)
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--replay_size', type=int, default=int(1e6))
+    parser.add_argument('--reward_scale', type=int, default=1)
     parser.add_argument('--without_start_steps', action='store_true')
     parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--exp_name', type=str, default='ude_td3')
@@ -626,18 +648,23 @@ if __name__ == '__main__':
     parser.add_argument('--uncertainty_driven_exploration', action='store_true')
     parser.add_argument('--dropout_rate', type=float, default=0.1)
     parser.add_argument('--uncertainty_policy_delay', type=int, default=5000)
-    parser.add_argument('--concentration_factor', type=float, default=0.5)
+    parser.add_argument('--concentration_factor', type=float, default=0.1)
     parser.add_argument('--minimum_exploration_level', type=float, default=0)
 
     args = parser.parse_args()
 
+    # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
+    data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
+                        'spinup_data')
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
     # import pdb; pdb.set_trace()
-    ude_td3(lambda: gym.make(args.env), actor_critic=core.mlp_actor_critic,
+    ude_td3(lambda: gym.make(args.env), render_env=args.render_env,
+            actor_critic=core.mlp_actor_critic,
             ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
             gamma=args.gamma, seed=args.seed, epochs=args.epochs,
             replay_size=args.replay_size,
+            reward_scale=args.reward_scale,
             without_start_steps=args.without_start_steps,
             without_delay_train=args.without_delay_train,
             n_post_action=args.n_post_action,

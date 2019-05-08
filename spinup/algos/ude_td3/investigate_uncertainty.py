@@ -13,7 +13,7 @@ class UncertaintyModule(object):
                  rnd_targ_act, rnd_pred_act,
                  rnd_targ_cri, rnd_pred_cri,
                  logger_kwargs,
-                 tf_var_scope_main='main', tf_var_scope_unc='uncertainty',
+                 tf_var_scope_main='main', tf_var_scope_target='target', tf_var_scope_unc='uncertainty',
                  uncertainty_type='dropout'):
         self.act_dim = act_dim
         self.obs_dim = obs_dim
@@ -36,12 +36,19 @@ class UncertaintyModule(object):
         self.track_obs_set_unc_frequency = track_obs_set_unc_frequency
 
         self.tf_var_scope_main = tf_var_scope_main
+        self.tf_var_scope_target = tf_var_scope_target
         self.tf_var_scope_unc = tf_var_scope_unc
 
         self.uncertainty_logger = Logger(output_fname='{}_uncertainty.txt'.format(uncertainty_type),
                                          **logger_kwargs)
         self.sample_logger = Logger(output_fname='{}_sample_observation.txt'.format(uncertainty_type),
                                     **logger_kwargs)
+    # TODO: target policy
+    def uncertainty_policy_update_targ(self,sess):
+        """Update uncertainty policy to current policy"""
+        sess.run(tf.group([tf.assign(v_unc, v_main)
+                           for v_main, v_unc in
+                           zip(get_vars(self.tf_var_scope_target), get_vars(self.tf_var_scope_unc))]))
 
     def uncertainty_policy_update(self, sess):
         """Update uncertainty policy to current policy"""
@@ -104,14 +111,14 @@ class DropoutUncertaintyModule(UncertaintyModule):
                  rnd_targ_act, rnd_pred_act,
                  rnd_targ_cri, rnd_pred_cri,
                  logger_kwargs,
-                 tf_var_scope_main='main', tf_var_scope_unc='uncertainty'):
+                 tf_var_scope_main='main', tf_var_scope_target='target', tf_var_scope_unc='uncertainty'):
         super().__init__(act_dim, obs_dim, n_post_action,
                          obs_set_size, track_obs_set_unc_frequency,
                          pi, x_ph, a_ph,
                          pi_dropout_mask_phs, pi_dropout_mask_generator,
                          rnd_targ_act, rnd_pred_act,
                          rnd_targ_cri, rnd_pred_cri,
-                         logger_kwargs, tf_var_scope_main, tf_var_scope_unc, 'dropout')
+                         logger_kwargs, tf_var_scope_main, tf_var_scope_target, tf_var_scope_unc, 'dropout')
         self.q1 = q1
         self.q2 = q2
         self.q1_dropout_mask_phs = q1_dropout_mask_phs
