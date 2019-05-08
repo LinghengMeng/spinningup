@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import roboschool
 import gym
 import time
 from spinup.algos.ude_td3_batchP import core
