@@ -374,6 +374,7 @@ def ude_td3_batchP(env_fn, render_env=False, actor_critic=core.mlp_actor_critic,
             a = sess.run(pi, feed_dict=feed_dictionary)[0][0]
             a += noise_scale * np.random.randn(act_dim)
             unc_a = 0
+            unc_rnd_a = 0
 
         a = np.clip(a, -act_limit, act_limit)
         unc_based_reward = np.mean(np.abs(unc_a))
