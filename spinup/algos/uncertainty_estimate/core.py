@@ -312,13 +312,16 @@ class BootstrappedEnsemble():
             if np.random.uniform(0, 1, 1) < bootstrapp_p:  # with bootstrapp_p probability to add to replay buffer
                 self.replay_buffers[i].store(input, label)
 
-    def train(self, sess, raw_batch_size, batch_size):
+    def train(self, sess, raw_batch_size, batch_size, uncertainty_based_minibatch_sample):
         loss = np.zeros((self.ensemble_size,))
         for i in range(self.ensemble_size):
-            # Select top n highest uncertainty samples
-            raw_batch = self.replay_buffers[i].sample_batch(raw_batch_size)
-            batch = self.resample_based_on_uncertainty(sess, raw_batch, raw_batch_size, batch_size)
-            # Train on the uncertainty-based batch
+            if uncertainty_based_minibatch_sample:
+                # Select top n highest uncertainty samples
+                raw_batch = self.replay_buffers[i].sample_batch(raw_batch_size)
+                batch = self.resample_based_on_uncertainty(sess, raw_batch, raw_batch_size, batch_size)
+            else:
+                batch = self.replay_buffers[i].sample_batch(batch_size)
+            # Train on the batch
             out = sess.run([self.ensemble_losses[i], self.ensemble_train_ops[i]], feed_dict={self.x_ph: batch['x'], self.y_ph: batch['y']})
             loss[i] = out[0]
         return loss

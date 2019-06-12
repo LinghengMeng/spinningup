@@ -14,7 +14,10 @@ def uncertainty_estimate(seed=0, x_dim=2, y_dim = 2, hidden_sizes = [300, 300],
                          x_low = -10, x_high = 10,
                          training_data_size=int(1e4), max_steps=int(1e6),
                          delayed_traininig=1000,
-                         learning_rate=1e-3, batch_size=100, raw_batch_size=500, replay_size=int(1e6),
+                         learning_rate=1e-3,
+                         batch_size=100,
+                         raw_batch_size=500, uncertainty_based_minibatch_sample=True,
+                         replay_size=int(1e6),
                          BerDrop_n_post=50, bootstrapp_p=0.75,
                          logger_kwargs=dict()):
     """
@@ -150,22 +153,25 @@ def uncertainty_estimate(seed=0, x_dim=2, y_dim = 2, hidden_sizes = [300, 300],
 
         # Training
         if step > raw_batch_size:
-            # Resample based on uncertainty rank
-            raw_batch = mlp_replay_buffer.sample_batch(raw_batch_size)
-            raw_batch_repmat = np.reshape(np.matlib.repmat(raw_batch['x'], 1, BerDrop_n_post),
-                                          (raw_batch_size * BerDrop_n_post, x_dim))
-            raw_batch_repmat_postSample = sess.run(ber_drop_mlp_y, feed_dict={x_ph: raw_batch_repmat})
-            raw_batch_repmat_postSample_reshape = np.reshape(raw_batch_repmat_postSample,
-                                                             (raw_batch_size, BerDrop_n_post, y_dim))
-            uncertainty_rank = np.zeros((raw_batch_size,))
-            for i_batch in range(raw_batch_size):
-                uncertainty_rank[i_batch] = np.sum(
-                    np.diag(np.cov(raw_batch_repmat_postSample_reshape[i_batch], rowvar=False)))
-            # Find top_n highest uncertainty samples
-            top_batch_size_highest_uncertainty_indices = np.argsort(uncertainty_rank)[-batch_size:]
-            mlp_batch = {}
-            mlp_batch['x'] = raw_batch['x'][top_batch_size_highest_uncertainty_indices]
-            mlp_batch['y'] = raw_batch['y'][top_batch_size_highest_uncertainty_indices]
+            if uncertainty_based_minibatch_sample:
+                # Resample based on uncertainty rank
+                raw_batch = mlp_replay_buffer.sample_batch(raw_batch_size)
+                raw_batch_repmat = np.reshape(np.matlib.repmat(raw_batch['x'], 1, BerDrop_n_post),
+                                              (raw_batch_size * BerDrop_n_post, x_dim))
+                raw_batch_repmat_postSample = sess.run(ber_drop_mlp_y, feed_dict={x_ph: raw_batch_repmat})
+                raw_batch_repmat_postSample_reshape = np.reshape(raw_batch_repmat_postSample,
+                                                                 (raw_batch_size, BerDrop_n_post, y_dim))
+                uncertainty_rank = np.zeros((raw_batch_size,))
+                for i_batch in range(raw_batch_size):
+                    uncertainty_rank[i_batch] = np.sum(
+                        np.diag(np.cov(raw_batch_repmat_postSample_reshape[i_batch], rowvar=False)))
+                # Find top_n highest uncertainty samples
+                top_batch_size_highest_uncertainty_indices = np.argsort(uncertainty_rank)[-batch_size:]
+                mlp_batch = {}
+                mlp_batch['x'] = raw_batch['x'][top_batch_size_highest_uncertainty_indices]
+                mlp_batch['y'] = raw_batch['y'][top_batch_size_highest_uncertainty_indices]
+            else:
+                mlp_batch = mlp_replay_buffer.sample_batch(batch_size)
 
             # Train MLP
             mlp_outs = sess.run([mlp_loss, mlp_train_op], feed_dict={x_ph: mlp_batch['x'], y_ph: mlp_batch['y']})
@@ -175,7 +181,7 @@ def uncertainty_estimate(seed=0, x_dim=2, y_dim = 2, hidden_sizes = [300, 300],
                                                                                    y_ph: mlp_batch['y']})
 
             # Train BootstrappedEnsemble
-            boots_ensemble_loss = boots_ensemble.train(sess, raw_batch_size, batch_size)
+            boots_ensemble_loss = boots_ensemble.train(sess, raw_batch_size, batch_size, uncertainty_based_minibatch_sample)
 
             # Log data
             logger.log_tabular('Step', step)
@@ -213,6 +219,7 @@ if __name__ == '__main__':
     parser.add_argument('--y_dim', type=int, default=5)
     parser.add_argument('--BerDrop_n_post', type=int, default=100)
     parser.add_argument('--training_data_size', type=int, default=4e4)
+    parser.add_argument('--uncertainty_based_minibatch_sample', action="store_true")
     parser.add_argument('--max_steps', type=int, default=4e4)
     parser.add_argument('--delayed_traininig', type=int, default=1000)
     args = parser.parse_args()
@@ -227,6 +234,7 @@ if __name__ == '__main__':
                          x_dim=args.x_dim, y_dim=args.y_dim,
                          BerDrop_n_post=args.BerDrop_n_post,
                          training_data_size=args.training_data_size,
+                         uncertainty_based_minibatch_sample=args.uncertainty_based_minibatch_sample,
                          max_steps=args.max_steps,
                          delayed_traininig=args.delayed_traininig,
                          logger_kwargs=logger_kwargs)
