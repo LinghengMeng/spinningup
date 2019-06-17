@@ -18,6 +18,7 @@ Deep Bootstrapped Ensemble Deterministic Policy Gradient (DBEDPG)
 """
 def dbedpg(env_name, render_env=False, ac_kwargs=dict(), seed=0,
            steps_per_epoch=5000, epochs=100,
+           ensemble_size = 20,
            batch_size=100, raw_batch_size=500, uncertainty_based_minibatch=False,
            replay_size=int(1e6), replay_buf_bootstrap_p=0.75,
            gamma=0.99,
@@ -104,7 +105,6 @@ def dbedpg(env_name, render_env=False, ac_kwargs=dict(), seed=0,
     # Action limit for clamping: critically, assumes all dimensions share the same bound!
     act_limit = env.action_space.high[0]
 
-    ensemble_size = 20
     hidden_sizes = list(ac_kwargs['hidden_sizes'])
     ac_ensemble = BootstrappedActorCriticEnsemble(ensemble_size,
                                                  obs_dim, act_dim, act_limit, hidden_sizes,
@@ -236,6 +236,8 @@ if __name__ == '__main__':
     parser.add_argument('--steps_per_epoch', type=int, default=5000)
     parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--exp_name', type=str, default='dbedpg')
+    parser.add_argument('--ensemble_size', type=int, default=20)
+    parser.add_argument('--replay_buf_bootstrap_p', type=float, default=0.75)
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
     parser.add_argument('--act_noise',type=float, default=0.1)
     parser.add_argument("--exploration-strategy", type=str, choices=["action_noise", "epsilon_greedy"],
@@ -258,6 +260,8 @@ if __name__ == '__main__':
            act_noise=args.act_noise,
            ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
            gamma=args.gamma, seed=args.seed,
+           ensemble_size=args.ensemble_size,
+           replay_buf_bootstrap_p=args.replay_buf_bootstrap_p,
            epochs=args.epochs,
            steps_per_epoch=args.steps_per_epoch, start_steps=args.start_steps,
            logger_kwargs=logger_kwargs)
