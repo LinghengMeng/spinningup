@@ -116,18 +116,18 @@ def dbedpg(env_name, render_env=False, ac_kwargs=dict(), seed=0,
 
     def get_action(o, noise_scale, ac_i=0):
         ac_ensemble_preds = ac_ensemble.prediction(o)
-        # 1. random actor-critic
-        # a = ac_ensemble_preds[np.random.randint(0, ensemble_size, 1)[0], :]
-        # a = ac_ensemble_preds[ac_i, :]
+        #1. random actor-critic
+        a = ac_ensemble_preds[np.random.randint(0, ensemble_size, 1)[0], :]
+        a = ac_ensemble_preds[ac_i, :]
         # a += noise_scale * np.random.randn(act_dim)
         # 2. one actor-critic for each epoch
         # a = ac_ensemble_preds[ac_i, :]
         # a += noise_scale * np.random.randn(act_dim)
-        # 3.
-        concentration_factor = 0.5
-        a_cov = np.cov(ac_ensemble_preds, rowvar=False)
-        a_cov_shaped = concentration_factor * a_cov
-        a = np.random.multivariate_normal(np.mean(ac_ensemble_preds, axis=0), a_cov_shaped, 1)[0]
+        # # 3.
+        # concentration_factor = 0.5
+        # a_cov = np.cov(ac_ensemble_preds, rowvar=False)
+        # a_cov_shaped = concentration_factor * a_cov
+        # a = np.random.multivariate_normal(np.mean(ac_ensemble_preds, axis=0), a_cov_shaped, 1)[0]
         return np.clip(a, -act_limit, act_limit)
 
     def test_agent(n=10, ac_i=0):
