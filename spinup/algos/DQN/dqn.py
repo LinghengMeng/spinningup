@@ -46,7 +46,7 @@ def dqn(seed, game_name, render,
         gamma=0.99, q_lr=0.00025,
         start_steps=50000, epochs=1000, steps_per_epoch=5000, max_ep_len=5000,
         replay_size=int(1e6), batch_size=32, target_net_update_frequency = 10000,
-        epsilon_max = 1, epsilon_min = 0.1, epsilon_decay_steps = 1000000,
+        epsilon_max = 1, epsilon_min = 0.1, epsilon_decay_steps = 1000000, epsilon_test=0.02,
         record_video_every=50,
         logger_kwargs=dict()):
     """
@@ -111,16 +111,12 @@ def dqn(seed, game_name, render,
             return np.random.randint(0, act_dim, size=1)
         return sess.run(pi, feed_dict={x_ph: np.expand_dims(np.asarray(o), axis=0)})[0]
 
-    def get_action_test(o):
-        """Get deterministic action without exploration."""
-        return sess.run(pi, feed_dict={x_ph: np.expand_dims(np.asarray(o), axis=0)})[0]
-
-    def test_agent(n=10):
+    def test_agent(epsilon_test, n=10):
         for j in range(n):
             o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
             while not(d or (ep_len == max_ep_len)):
-                # Take deterministic actions at test time (noise_scale=0)
-                o, r, d, _ = test_env.step(get_action_test(o))
+                # Take epsilon greedy action
+                o, r, d, _ = test_env.step(get_action(o, epsilon_test))
                 ep_ret += r
                 ep_len += 1
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
@@ -192,7 +188,7 @@ def dqn(seed, game_name, render,
             #     logger.save_state({'env': env}, None)
 
             # Test the performance of the deterministic version of the agent.
-            test_agent()
+            test_agent(epsilon_test, n= 4)
 
             # Log info about epoch
             logger.log_tabular('Epoch', epoch)

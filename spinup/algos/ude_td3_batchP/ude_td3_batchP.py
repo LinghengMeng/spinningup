@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-import roboschool
+# import roboschool
 import gym
 import time
 from spinup.algos.ude_td3_batchP import core
@@ -211,9 +211,9 @@ def ude_td3_batchP(env_fn, render_env=False, actor_critic=core.mlp_actor_critic,
         # RND Target and Predictor Network
         rnd_lr = 1e-3
         rnd_targ_act, \
-        rnd_pred_act, _,_, rnd_pred_act_dropout_mask_phs, \
+        rnd_pred_act, rnd_pred_act_reg, rnd_pred_act_dropout_mask_generator, rnd_pred_act_dropout_mask_phs, \
         rnd_targ_cri, \
-        rnd_pred_cri, _,_, rnd_pred_cri_dropout_mask_phs = core.random_net_distill(x_ph, a_ph, **ac_kwargs, dropout_rate=0)
+        rnd_pred_cri, rnd_pred_cri_reg, rnd_pred_cri_dropout_mask_generator, rnd_pred_cri_dropout_mask_phs = core.random_net_distill(x_ph, a_ph, **ac_kwargs, dropout_rate=0)
 
     # TODO: add environment model learning transition dynamics
 
@@ -292,12 +292,12 @@ def ude_td3_batchP(env_fn, render_env=False, actor_critic=core.mlp_actor_critic,
     train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('main/q'))
 
     # RND losses and train ops
-    rnd_loss_act = tf.reduce_mean((rnd_pred_act[0] - rnd_targ_act)**2)
+    rnd_loss_act = tf.reduce_mean((rnd_pred_act[0] - rnd_targ_act)**2) + rnd_pred_act_reg/batch_size
     rnd_optimizer_act = tf.train.AdamOptimizer(learning_rate=rnd_lr)
     train_rnd_op_act = rnd_optimizer_act.minimize(rnd_loss_act,
                                                   var_list=get_vars('random_net_distill/rnd_pred_act'))
 
-    rnd_loss_cri = tf.reduce_mean((rnd_pred_cri[0] - rnd_targ_cri)**2)
+    rnd_loss_cri = tf.reduce_mean((rnd_pred_cri[0] - rnd_targ_cri)**2) + rnd_pred_cri_reg/batch_size
     rnd_optimizer_cri = tf.train.AdamOptimizer(learning_rate=rnd_lr)
     train_rnd_op_cri = rnd_optimizer_cri.minimize(rnd_loss_cri,
                                                   var_list=get_vars('random_net_distill/rnd_pred_cri'))
@@ -325,6 +325,17 @@ def ude_td3_batchP(env_fn, render_env=False, actor_critic=core.mlp_actor_critic,
                 feed_dictionary[dropout_mask_ph[mask_i]] = np.ones([1, dropout_mask_ph[mask_i].shape.as_list()[1]])
         return feed_dictionary
 
+    def set_dropout_mask_randomly_and_post_nuber_to_one(feed_dictionary, mask_phs, mask_generators):
+        if len(mask_phs) != len(mask_generators):
+            raise ValueError('mask_phs and mask_generators do not match.')
+        else:
+            for i in range(len(mask_phs)):
+                dropout_mask_ph = mask_phs[i]
+                dropout_masks = mask_generators[i].generate_dropout_mask(post_size=1)
+                for mask_i in range(len(dropout_mask_ph)):
+                    feed_dictionary[dropout_mask_ph[mask_i]] = dropout_masks[mask_i]
+        return feed_dictionary
+
     def get_action_train(o, noise_scale, pi_unc_module, step_index):
         feed_dictionary = {x_ph: o.reshape(1, -1)}
         # Set dropout masks to one
@@ -343,6 +354,7 @@ def ude_td3_batchP(env_fn, render_env=False, actor_critic=core.mlp_actor_critic,
             a_prediction = sess.run(pi, feed_dict=feed_dictionary)[0][0]
 
             # 2. Generate post sampled actions
+            # TODO： get covariance based on online and target policy respectively and calculate the difference
             a_post = pi_unc_module.get_post_samples_act(o, sess, step_index)
             rnd_a_post = pi_unc_module.get_post_samples_rnd_act(o, sess, step_index)
 
@@ -485,7 +497,7 @@ def ude_td3_batchP(env_fn, render_env=False, actor_critic=core.mlp_actor_critic,
             if t % uncertainty_policy_delay == 0:
                 # pi_unc_module.uncertainty_policy_update(sess)
                 pi_unc_module.update_weights_of_main_unc(sess)
-                pi_unc_module.update_weights_of_rnd_unc(sess)
+
 
         # Step the env
         if render_env:
@@ -558,7 +570,11 @@ def ude_td3_batchP(env_fn, render_env=False, actor_critic=core.mlp_actor_critic,
                     feed_dict_train[d_ph] = batch['done']
 
                     # Train Random Net Distillation
-                    # import pdb; pdb.set_trace()
+                    # change dropout masks every training step
+                    mask_phs = [rnd_pred_act_dropout_mask_phs, rnd_pred_cri_dropout_mask_phs]
+                    mask_generators = [rnd_pred_act_dropout_mask_generator, rnd_pred_cri_dropout_mask_generator]
+                    feed_dict_train = set_dropout_mask_randomly_and_post_nuber_to_one(feed_dict_train, mask_phs,
+                                                                                      mask_generators)
                     rnd_step_ops_act = [rnd_loss_act, rnd_targ_act, rnd_pred_act, train_rnd_op_act]
                     rnd_outs_act = sess.run(rnd_step_ops_act, feed_dict_train)
                     logger.store(LossRndAct=rnd_outs_act[0])
@@ -577,6 +593,8 @@ def ude_td3_batchP(env_fn, render_env=False, actor_critic=core.mlp_actor_critic,
                         # Delayed policy update
                         outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict_train)
                         logger.store(LossPi=outs[0])
+                # No weight update delay
+                pi_unc_module.update_weights_of_rnd_unc(sess)
 
             logger.store(EpRet=ep_ret, EpLen=ep_len,
                          EpQ1Var=ep_q1_var, EpQ2Var=ep_q2_var,
@@ -648,7 +666,7 @@ if __name__ == '__main__':
     parser.add_argument('--uncertainty_driven_exploration', action='store_true')
     parser.add_argument('--dropout_rate', type=float, default=0.1)
     parser.add_argument('--uncertainty_policy_delay', type=int, default=5000)
-    parser.add_argument('--concentration_factor', type=float, default=0.1)
+    parser.add_argument('--concentration_factor', type=float, default=0.5)
     parser.add_argument('--minimum_exploration_level', type=float, default=0)
 
     args = parser.parse_args()

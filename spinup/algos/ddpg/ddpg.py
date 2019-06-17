@@ -45,7 +45,7 @@ class ReplayBuffer:
 Deep Deterministic Policy Gradient (DDPG)
 
 """
-def ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0, 
+def ddpg(env_fn, render_env=False, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
          steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, 
          polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000, 
          act_noise=0.1, policy_delay=2, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
@@ -214,6 +214,8 @@ def ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             a = env.action_space.sample()
 
         # Step the env
+        if render_env:
+            env.render()
         o2, r, d, _ = env.step(a)
         ep_ret += r
         ep_len += 1
@@ -286,14 +288,17 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
+    parser.add_argument('--render_env', action="store_true")
     parser.add_argument('--hid', type=int, default=300)
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
     parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--steps_per_epoch', type=int, default=5000)
+    parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--exp_name', type=str, default='ddpg')
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
-
+    parser.add_argument('--act_noise',type=float, default=0.1)
     parser.add_argument("--exploration-strategy", type=str, choices=["action_noise", "epsilon_greedy"],
                         default='epsilon_greedy', help='action_noise or epsilon_greedy')
     parser.add_argument("--epsilon-max", type=float, default=1.0, help='maximum of epsilon')
@@ -313,9 +318,13 @@ if __name__ == '__main__':
     # if args.hardcopy_target_nn:
     #     polyak = 0
 
-    ddpg(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
+    ddpg(lambda : gym.make(args.env), render_env=args.render_env,
+         act_noise=args.act_noise,
+         actor_critic=core.mlp_actor_critic,
          ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
-         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+         gamma=args.gamma, seed=args.seed,
+         epochs=args.epochs,
+         steps_per_epoch=args.steps_per_epoch, start_steps=args.start_steps,
          logger_kwargs=logger_kwargs)
 
 # python  spinup/algos/ddpg/ddpg.py --env HalfCheetah-v2 --seed 3 --l 2 --exp_name ddpg_two_layers_delay_policy

@@ -207,7 +207,7 @@ class ActorCritic():
 #         self.obs_dim = obs_dim
 #         self.act_dim = act_dim
 #         self.act_limit = act_limit
-# 
+#
 #         self.hidden_sizes = hidden_sizes
 #         self.replay_size = replay_size
 #         self.replay_buf_bootstrap_p = replay_buf_bootstrap_p

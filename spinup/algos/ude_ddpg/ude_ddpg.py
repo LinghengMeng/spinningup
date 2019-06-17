@@ -1,25 +1,24 @@
-import ray
-ray.shutdown()
-ray.init()
 import numpy as np
+import numpy.matlib
 import tensorflow as tf
+import tensorflow_probability as tfp
 import gym
 import time
 from spinup.algos.ude_ddpg import core
-from spinup.algos.ude_ddpg.core import get_vars
-from spinup.utils.logx import EpochLogger
-
-
-
-import os
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
+from spinup.algos.ude_ddpg.core import MLP, MLPAleatoricUnc, BeroulliDropoutMLP, get_vars, count_vars
+from spinup.utils.logx import EpochLogger, Logger
+import os.path as osp
 
 class ReplayBuffer:
     """
-    A simple FIFO experience replay buffer for DDPG agents.
+    A simple FIFO experience replay buffer for TD3 agents.
     """
 
-    def __init__(self, obs_dim, act_dim, size):
+    def __init__(self, obs_dim, act_dim, size,
+                 logger_fname='experiences_log.txt', **logger_kwargs):
+        # ExperienceLogger: save experiences for supervised learning
+        logger_kwargs['output_fname'] = logger_fname
+        self.experience_logger = Logger(**logger_kwargs)
         self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
         self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
         self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
@@ -27,7 +26,11 @@ class ReplayBuffer:
         self.done_buf = np.zeros(size, dtype=np.float32)
         self.ptr, self.size, self.max_size = 0, 0, size
 
-    def store(self, obs, act, rew, next_obs, done):
+    def store(self, obs, act, rew, next_obs, done,
+              step_index, steps_per_epoch, start_time, **kwargs):
+        # Save experiences in disk
+        self.log_experiences(obs, act, rew, next_obs, done,
+                             step_index, steps_per_epoch, start_time, **kwargs)
         self.obs1_buf[self.ptr] = obs
         self.obs2_buf[self.ptr] = next_obs
         self.acts_buf[self.ptr] = act
@@ -37,29 +40,52 @@ class ReplayBuffer:
         self.size = min(self.size+1, self.max_size)
 
     def sample_batch(self, batch_size=32):
-        idxs = np.random.randint(0, self.size, size=batch_size)
+        idxs = np.random.randint(0, self.size, size=int(batch_size))
         return dict(obs1=self.obs1_buf[idxs],
                     obs2=self.obs2_buf[idxs],
                     acts=self.acts_buf[idxs],
                     rews=self.rews_buf[idxs],
                     done=self.done_buf[idxs])
 
+    def log_experiences(self, obs, act, rew, next_obs, done,
+                        step_index, steps_per_epoch, start_time, **kwargs):
+        self.experience_logger.log_tabular('Epoch', step_index // steps_per_epoch)
+        self.experience_logger.log_tabular('Step', step_index)
+        # Log observation
+        for i, o_i in enumerate(obs):
+            self.experience_logger.log_tabular('o_{}'.format(i), o_i)
+        # Log action
+        for i, a_i in enumerate(act):
+            self.experience_logger.log_tabular('a_{}'.format(i), a_i)
+        # Log reward
+        self.experience_logger.log_tabular('r', rew)
+        # Log next observation
+        for i, o2_i in enumerate(next_obs):
+            self.experience_logger.log_tabular('o2_{}'.format(i), o2_i)
+        # Log other data
+        for key, value in kwargs.items():
+            for i, v in enumerate(np.array(value).flatten(order='C')):
+                self.experience_logger.log_tabular('{}_{}'.format(key, i), v)
+        # Log done
+        self.experience_logger.log_tabular('d', done)
+        self.experience_logger.log_tabular('Time', time.time() - start_time)
+        self.experience_logger.dump_tabular(print_data=False)
+
 """
 
-Uncertainty Driven Exploration - Deep Deterministic Policy Gradient (UDE-DDPG)
+uncertainty driven exploration TD3 (Twin Delayed DDPG)
 
 """
 def ude_ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
-             steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99,
-             polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000,
-             act_noise=0.1, policy_delay=2, max_ep_len=1000,
-             n_post_action = 10,
-             sample_action_with_dropout = True, dropout_rate=0.1,
-             action_choose_method = 'random_sample',
-             uncertainty_noise_type = 'std_noise',
-             a_var_clip_max = 1, a_var_clip_min = 0.1,
-             a_std_clip_max = 1, a_std_clip_min = 0.1,
-             logger_kwargs=dict(), save_freq=1):
+                steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99,
+                polyak=0.995, pi_lr=1e-3, q_lr=1e-3,
+                without_start_steps=True, batch_size=100, start_steps=10000,
+                without_delay_train=False,
+             reward_scale=1,
+                uncertainty_driven_exploration=True, n_post=100, concentration_factor=0.5,
+                uncertainty_policy_delay=5000,
+                act_noise=0.1, target_noise=0.2, noise_clip=0.5, policy_delay=2,
+                max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
 
     Args:
@@ -75,16 +101,19 @@ def ude_ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=
             ===========  ================  ======================================
             ``pi``       (batch, act_dim)  | Deterministically computes actions
                                            | from policy given states.
-            ``q``        (batch,)          | Gives the current estimate of Q* for 
+            ``q1``       (batch,)          | Gives one estimate of Q* for 
                                            | states in ``x_ph`` and actions in
                                            | ``a_ph``.
-            ``q_pi``     (batch,)          | Gives the composition of ``q`` and 
+            ``q2``       (batch,)          | Gives another estimate of Q* for 
+                                           | states in ``x_ph`` and actions in
+                                           | ``a_ph``.
+            ``q1_pi``    (batch,)          | Gives the composition of ``q1`` and 
                                            | ``pi`` for states in ``x_ph``: 
-                                           | q(x, pi(x)).
+                                           | q1(x, pi(x)).
             ===========  ================  ======================================
 
         ac_kwargs (dict): Any kwargs appropriate for the actor_critic 
-            function you provided to DDPG.
+            function you provided to TD3.
 
         seed (int): Seed for random number generators.
 
@@ -119,6 +148,15 @@ def ude_ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=
         act_noise (float): Stddev for Gaussian exploration noise added to 
             policy at training time. (At test time, no noise is added.)
 
+        target_noise (float): Stddev for smoothing noise added to target 
+            policy.
+
+        noise_clip (float): Limit for absolute value of target policy 
+            smoothing noise.
+
+        policy_delay (int): Policy will only be updated once every 
+            policy_delay times for each update of the Q-networks.
+
         max_ep_len (int): Maximum length of trajectory / episode / rollout.
 
         logger_kwargs (dict): Keyword args for EpochLogger.
@@ -127,6 +165,9 @@ def ude_ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=
             the current policy and value function.
 
     """
+    # TODO: Test no start steps
+    if without_start_steps:
+        start_steps = batch_size
 
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
@@ -147,37 +188,117 @@ def ude_ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=
     # Inputs to computation graph
     x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
-    # Main outputs from computation graph
+    hidden_sizes = list(ac_kwargs['hidden_sizes'])
+    actor_hidden_activation = tf.keras.activations.relu
+    actor_output_activation = tf.keras.activations.tanh
+    critic_hidden_activation=tf.keras.activations.relu
+    critic_output_activation=tf.keras.activations.linear
+    LOG_VAR_MIN=-20
+    LOG_VAR_MAX=20 #20
+    # Main actor-critic
     with tf.variable_scope('main'):
-        pi, pi_post_samplers, q, q_pi = actor_critic(x_ph, a_ph, **ac_kwargs,
-                                                     create_post_samplers=True, n_post=n_post_action,
-                                                     dropout_rate=dropout_rate)
+        # actor = MLP(hidden_sizes+[act_dim],
+        #             hidden_activation=actor_hidden_activation,
+        #             output_activation=tf.keras.activations.tanh)
+        actor = BeroulliDropoutMLP(hidden_sizes + [act_dim], weight_regularizer=1e-6, dropout_rate=0.025,
+                                   hidden_activation=actor_hidden_activation,
+                                   output_activation=actor_output_activation)
+        # critic = MLP(hidden_sizes + [1],
+        #              hidden_activation=critic_hidden_activation,
+        #              output_activation=critic_output_activation)
+        critic = MLPAleatoricUnc(hidden_sizes + [1],
+                                 hidden_activation=critic_hidden_activation,
+                                 output_activation=critic_output_activation)
+
+        # pi = act_limit * actor(x_ph)
+        # pi = act_limit*actor(x_ph, duplicate_input = False)
+        pi = act_limit * actor(x_ph, training=True, duplicate_input=False)
+        q_mean, q_logvar = critic(tf.concat([x_ph, a_ph], axis=-1), duplicate_input = False)
+        # q_logvar = tf.clip_by_value(q_logvar, LOG_VAR_MIN, LOG_VAR_MAX)
+        # q_logvar = LOG_VAR_MIN + 0.5 * (LOG_VAR_MAX - LOG_VAR_MIN) * (q_logvar + 1)
+        q_mean, q_logvar = tf.squeeze(q_mean, axis=1), tf.squeeze(q_logvar, axis=1)
+        # q_dist = tf.distributions.Normal(loc=q_mean, scale=tf.sqrt(tf.exp(q_logvar)))
+        # q = tf.squeeze(q_dist.sample([1])[0], axis=1)
+
+        q_pi_mean, q_pi_logvar = critic(tf.concat([x_ph, pi], axis=-1), duplicate_input = False)
+        # q_pi_logvar = tf.clip_by_value(q_pi_logvar, LOG_VAR_MIN, LOG_VAR_MAX)
+        # q_pi_logvar = LOG_VAR_MIN + 0.5 * (LOG_VAR_MAX - LOG_VAR_MIN) * (q_pi_logvar + 1)
+        q_pi_mean, q_pi_logvar = tf.squeeze(q_pi_mean, axis=1), tf.squeeze(q_pi_logvar, axis=1)
+        # q_pi_dist = tf.distributions.Normal(loc=q_pi_mean, scale=tf.sqrt(tf.exp(q_pi_logvar)))
+        # q_pi = tf.squeeze(q_pi_dist.sample([1])[0], axis=1)
     
-    # Target networks
+    # Target actor-critic
     with tf.variable_scope('target'):
-        # Note that the action placeholder going to actor_critic here is 
-        # irrelevant, because we only need q_targ(s, pi_targ(s)).
-        pi_targ, pi_targ_post_samplers, _, q_pi_targ  = actor_critic(x2_ph, a_ph, **ac_kwargs)
+        # actor_targ = MLP(hidden_sizes + [act_dim],
+        #                  hidden_activation=actor_hidden_activation,
+        #                  output_activation=actor_output_activation)
+        actor_targ = BeroulliDropoutMLP(hidden_sizes + [act_dim], weight_regularizer=1e-6, dropout_rate=0.025,
+                                        hidden_activation=actor_hidden_activation,
+                                        output_activation=actor_output_activation)
+        # critic_targ = MLP(hidden_sizes + [1],
+        #                   hidden_activation=critic_hidden_activation,
+        #                   output_activation=critic_output_activation)
+        critic_targ = MLPAleatoricUnc(hidden_sizes + [1],
+                                      hidden_activation=critic_hidden_activation,
+                                      output_activation=critic_output_activation)
+
+        # pi_targ = act_limit*actor_targ(x2_ph)
+        # pi_targ = act_limit * actor_targ(x2_ph, duplicate_input=False)
+        pi_targ = act_limit * actor_targ(x2_ph, training=True, duplicate_input=False)
+        q_pi_mean_targ, q_pi_logvar_targ = critic_targ(tf.concat([x2_ph, pi_targ], axis=-1), duplicate_input = False)
+        # q_pi_logvar_targ = tf.clip_by_value(q_pi_logvar_targ, LOG_VAR_MIN, LOG_VAR_MAX)
+        # q_pi_logvar_targ = LOG_VAR_MIN + 0.5 * (LOG_VAR_MAX - LOG_VAR_MIN) * (q_pi_logvar_targ + 1)
+        q_pi_mean_targ, q_pi_logvar_targ = tf.squeeze(q_pi_mean_targ, axis=1), tf.squeeze(q_pi_logvar_targ, axis=1)
+        # q_pi_dist_targ = tf.distributions.Normal(loc=q_pi_mean_targ, scale=tf.sqrt(tf.exp(q_pi_logvar_targ)))
+        # q_pi_targ = tf.squeeze(q_pi_dist_targ.sample([1])[0], axis=1)
+
+    # Create LazyBernoulliDropoutMLP:
+    #       which copys weights from MLP by
+    #           sess.run(lazy_ber_drop_mlp_update)
+    #       , then post sample predictions with dropout masks.
+    with tf.variable_scope('LazyBernoulliDropoutUncertaintySample'):
+        # define placeholder for parallel sampling
+        #   batch x n_post x dim
+        lazy_bernoulli_dropout_actor = BeroulliDropoutMLP(hidden_sizes + [act_dim], weight_regularizer=1e-6, dropout_rate=0.025,
+                                                          hidden_activation=actor_hidden_activation,
+                                                          output_activation=actor_output_activation)
+        lazy_ber_drop_pi = act_limit*lazy_bernoulli_dropout_actor(x_ph, training=True, duplicate_input=False)  # Set training=True to sample with dropout masks
+        lazy_ber_drop_actor_update = tf.group([tf.assign(v_lazy_ber_drop_mlp, v_mlp)
+                                               for v_mlp, v_lazy_ber_drop_mlp in
+                                               zip(actor.variables, lazy_bernoulli_dropout_actor.variables)])
 
     # Experience buffer
-    replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
+    replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size,
+                                 logger_fname='experiences_log.txt', **logger_kwargs)
 
     # Count variables
-    var_counts = tuple(core.count_vars(scope) for scope in ['main/pi', 'main/q', 'main'])
-    print('\nNumber of parameters: \t pi: %d, \t q: %d, \t total: %d\n'%var_counts)
+    print('\nNumber of parameters: \t pi: {:d}, \t q: {:d}, \t total: {:d}\n'.format(count_vars(actor.variables),
+                                                                                     count_vars(critic.variables),
+                                                                                     count_vars(get_vars('main'))))
 
-    # Bellman backup for Q function
-    backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*q_pi_targ)
+    # Bellman backup for Q functions, using Clipped Double-Q targets
+    # TODO: conservative q value
+    #   conservative_q_pi = mu - 1/2 * sigma
+    #   conservative_q_pi = q_pi_mean_targ - tf.sqrt(tf.exp(q_pi_logvar_targ)_
+    backup = tf.stop_gradient(r_ph*reward_scale + gamma*(1-d_ph)*q_pi_mean_targ)
 
-    # DDPG losses
-    pi_loss = -tf.reduce_mean(q_pi)
-    q_loss = tf.reduce_mean((q-backup)**2)
+    # backup = tf.stop_gradient(r_ph * reward_scale + gamma * (1 - d_ph) * (q_pi_mean_targ-tf.sqrt(tf.exp(q_pi_logvar_targ))))
+    # backup = tf.stop_gradient(r_ph * reward_scale + gamma * (1 - d_ph) * (q_pi_mean_targ - q_pi_logvar_targ)) # Conservative q
+    # backup = tf.stop_gradient(r_ph * reward_scale + gamma * (1 - d_ph) * (q_pi_mean_targ - tf.log(tf.sqrt(tf.exp(q_pi_logvar_targ)))))
+
+    #  losses
+    pi_loss = -tf.reduce_mean(q_pi_mean)
+    # q_loss = tf.reduce_mean((q-backup)**2)
+    # EPS = 1e-8
+    # q_loss = tf.reduce_sum(0.5*tf.exp(-q_logvar) * (q_mean - backup) ** 2 + 0.5*q_logvar)
+    q_loss = tf.reduce_mean((q_mean - backup) ** 2)
+
 
     # Separate train ops for pi, q
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
     q_optimizer = tf.train.AdamOptimizer(learning_rate=q_lr)
-    train_pi_op = pi_optimizer.minimize(pi_loss, var_list=get_vars('main/pi'))
-    train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('main/q'))
+    train_pi_op = pi_optimizer.minimize(pi_loss, var_list=actor.variables)
+    train_q_op = q_optimizer.minimize(q_loss, var_list=critic.variables)
 
     # Polyak averaging for target variables
     target_update = tf.group([tf.assign(v_targ, polyak*v_targ + (1-polyak)*v_main)
@@ -190,78 +311,46 @@ def ude_ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
     sess.run(target_init)
+    sess.run(lazy_ber_drop_actor_update)
 
     # Setup model saving
-    logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q': q})
+    # logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q1': q1, 'q2': q2})
 
-    def get_action_test(o):
-        """Get action in test phase."""
+    def get_uncertainty_driven_explore_action(o):
+        o_post_samples = np.matlib.repmat(o.reshape(1,-1), n_post, 1)  # repmat x for post sampling
+
+        # 1. Generate action Prediction
+        a_pred = sess.run(pi, feed_dict={x_ph: o.reshape(1, -1)})[0]
+
+        # 2. Generate post sampled actions
+        a_post = sess.run(lazy_ber_drop_pi, feed_dict={x_ph: o_post_samples})
+
+        a = np.zeros((act_dim,))
+        if act_dim > 1:
+            a_cov = np.cov(a_post, rowvar=False)
+            a_cov_shaped = concentration_factor * a_cov
+            a = np.random.multivariate_normal(a_pred, a_cov_shaped, 1)[0]
+            unc_a = a_cov
+        else:
+            a_std = np.std(a_post, axis=0)
+            a_std_shaped = concentration_factor * a_std
+            a = np.random.normal(a_pred, a_std_shaped, 1)[0]
+            unc_a = a_std
+
+        a = np.clip(a, -act_limit, act_limit)
+        # TODO: logdet as intrinsic reward
+        return a, unc_a
+
+    def get_gaussian_noise_explore_action(o, noise_scale):
         a = sess.run(pi, feed_dict={x_ph: o.reshape(1,-1)})[0]
+        a += noise_scale * np.random.randn(act_dim)
         return np.clip(a, -act_limit, act_limit)
 
-    def get_action_train(o):
-        """Get action in training phase"""
-        a_var_uncertainty = 0
-        a_var_uncertainty_clipped = 0
-        a_std_uncertainty = 0
-        a_std_uncertainty_clipped = 0
-        if sample_action_with_dropout:
-            # Collect post samples into a ndarray of size (n_post, act_dim)
-            pi_weights = sess.run(get_vars('main/pi')) # Get current policy weights
-            a_post = np.array(ray.get([p_s.sample_action.remote(pi_weights, o) for p_s in pi_post_samplers]))
-
-            # TODO: var and std must been scaled or clipped.
-            #  Otherwise, a huge variance will always cause action out of act_lim and then be clipped to -1 or 1.
-            #  we also need to set a lower bound to enforce a minimum exploration
-            a_mean = np.mean(a_post, axis=0)
-            a_median = np.median(a_post, axis=0)
-
-            a_var = np.var(a_post, axis=0)
-            a_var_clipped = np.clip(a_var, a_var_clip_min, a_var_clip_max)
-            a_var_noise = a_var_clipped * np.random.randn(act_dim)
-
-            a_std = np.std(a_post, axis=0)
-            a_std_clipped = np.clip(a_std, a_std_clip_min, a_std_clip_max)
-            a_std_noise = a_std_clipped * np.random.randn(act_dim)
-            # TODO: define uncertainty to a value that is not affect by action dimension.
-            a_var_uncertainty = np.mean(a_var)  # np.sum(a_var)
-            a_var_uncertainty_clipped = np.mean(a_var_clipped)  # np.sum(a_var_clipped)
-            a_std_uncertainty = np.mean(a_std)  # np.sum(a_std)
-            a_std_uncertainty_clipped = np.mean(a_std_clipped)  # np.sum(a_std_clipped)
-
-            # TODO: clip noise within a range. Maybe not necessary.
-            if uncertainty_noise_type == 'var_noise':
-                noise = a_var_noise
-            elif uncertainty_noise_type == 'std_noise':
-                noise = a_std_noise
-            else:
-                raise ValueError('Please choose a proper noise_type.')
-            a = np.zeros((act_dim,))
-            if action_choose_method == 'random_sample':
-                # Method 1: randomly sample one from post sampled actions
-                a = a_post[np.random.choice(n_post_action)]
-            elif action_choose_method == 'gaussian_sample':
-                # Method 2: estimate mean and std, then sample from a Gaussian distribution
-                for a_i in range(act_dim):
-                    a[a_i] = np.random.normal(a_mean[a_i], a_std_clipped[a_i], 1)
-            elif action_choose_method == 'mean_of_samples':
-                a = a_mean
-            elif action_choose_method == 'median_of_sample':
-                pass
-            elif action_choose_method == 'mean_and_variance_based_noise':
-                a = a_mean + noise
-            elif action_choose_method == 'median_and_variance_based_noise':
-                a = a_median + noise
-            elif action_choose_method == 'prediction_and_variance_based_noise':
-                a_prediction = sess.run(pi, feed_dict={x_ph: o.reshape(1,-1)})[0]
-                a = a_prediction + noise
-            else:
-                pass
-        else:
-            a = sess.run(pi, feed_dict={x_ph: o.reshape(1,-1)})[0]
-            a += act_noise * np.random.randn(act_dim)
-        return np.clip(a, -act_limit, act_limit), \
-               a_var_uncertainty, a_var_uncertainty_clipped, a_std_uncertainty, a_std_uncertainty_clipped
+    def get_action_test(o):
+        """Get deterministic action without exploration."""
+        a = sess.run(pi, feed_dict={x_ph: o.reshape(1, -1)})[0]
+        # print('test a={}'.format(a))
+        return np.clip(a, -act_limit, act_limit)
 
     def test_agent(n=10):
         for j in range(n):
@@ -274,9 +363,7 @@ def ude_ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
     start_time = time.time()
-    o, r, d, ep_ret, ep_len, \
-    ep_a_var_uncertainty,ep_a_var_uncertainty_clipped, \
-    ep_a_std_uncertainty, ep_a_std_uncertainty_clipped = env.reset(), 0, False, 0, 0, 0, 0, 0, 0
+    o, r, d, ep_ret, ep_len, ep_unc = env.reset(), 0, False, 0, 0, 0
     total_steps = steps_per_epoch * epochs
 
     # Main loop: collect experience in env and update/log each epoch
@@ -288,24 +375,24 @@ def ude_ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=
         use the learned policy (with some noise, via act_noise). 
         """
         if t > start_steps:
-            a, a_var_uncertainty, a_var_uncertainty_clipped, \
-            a_std_uncertainty, a_std_uncertainty_clipped = get_action_train(o)
+            if uncertainty_driven_exploration:
+                if t%uncertainty_policy_delay==0:
+                    sess.run(lazy_ber_drop_actor_update)
+                a, unc_a = get_uncertainty_driven_explore_action(o)
+            else:
+                a = get_gaussian_noise_explore_action(o, act_noise)
         else:
             a = env.action_space.sample()
-            # TODO:
-            a_var_uncertainty = 0
-            a_var_uncertainty_clipped = 0
-            a_std_uncertainty = 0
-            a_std_uncertainty_clipped = 0
 
+        if t<start_steps or (not uncertainty_driven_exploration):
+            unc_a = np.zeros((act_dim, act_dim))
+
+        # print(t)
         # Step the env
         o2, r, d, _ = env.step(a)
         ep_ret += r
         ep_len += 1
-        ep_a_var_uncertainty += a_var_uncertainty
-        ep_a_var_uncertainty_clipped += a_var_uncertainty_clipped
-        ep_a_std_uncertainty += a_std_uncertainty
-        ep_a_std_uncertainty_clipped += a_std_uncertainty_clipped
+        ep_unc += np.sum(unc_a)
 
         # Ignore the "done" signal if it comes from hitting the time
         # horizon (that is, when it's an artificial terminal signal
@@ -313,46 +400,56 @@ def ude_ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        replay_buffer.store(o, a, r, o2, d)
+        replay_buffer.store(o, a,  r, o2, d, t, steps_per_epoch, start_time, unc_a=unc_a)
 
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
         o = o2
 
+        # if without_delay_train:
+        #     batch = replay_buffer.sample_batch(batch_size)
+        #     feed_dict = {x_ph: batch['obs1'],
+        #                  x2_ph: batch['obs2'],
+        #                  a_ph: batch['acts'],
+        #                  r_ph: batch['rews'],
+        #                  d_ph: batch['done']
+        #                  }
+        #     q_step_ops = [q_loss, q_mean, tf.sqrt(tf.exp(q_logvar)), train_q_op]
+        #     outs = sess.run(q_step_ops, feed_dict)
+        #     logger.store(LossQ=outs[0], QVals=outs[1], QStds=outs[2])
+        #
+        #     # Delayed policy update
+        #     outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+        #     logger.store(LossPi=outs[0])
+
         if d or (ep_len == max_ep_len):
             """
-            Perform all DDPG updates at the end of the trajectory,
-            in accordance with tuning done by TD3 paper authors.
+            Perform all TD3 updates at the end of the trajectory
+            (in accordance with source code of TD3 published by
+            original authors).
             """
-            for j in range(ep_len):
-                batch = replay_buffer.sample_batch(batch_size)
-                feed_dict = {x_ph: batch['obs1'],
-                             x2_ph: batch['obs2'],
-                             a_ph: batch['acts'],
-                             r_ph: batch['rews'],
-                             d_ph: batch['done']
-                            }
+            if not without_delay_train:
+                for j in range(ep_len):
+                    batch = replay_buffer.sample_batch(batch_size)
+                    feed_dict = {x_ph: batch['obs1'],
+                                 x2_ph: batch['obs2'],
+                                 a_ph: batch['acts'],
+                                 r_ph: batch['rews'],
+                                 d_ph: batch['done']
+                                }
 
-                # Q-learning update
-                outs = sess.run([q_loss, q, train_q_op], feed_dict)
-                logger.store(LossQ=outs[0], QVals=outs[1])
+                    q_step_ops = [q_loss, q_mean, q_logvar, train_q_op]
+                    outs = sess.run(q_step_ops, feed_dict)
+                    logger.store(LossQ=outs[0], QVals=outs[1], QLogVars=outs[2])
+                    # print('LossQ={}, QVals={}, QLogVars={}'.format(outs[0], outs[1], outs[2]))
+                    if j % policy_delay == 0:
+                        # Delayed policy update
+                        outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+                        logger.store(LossPi=outs[0])
 
-                # Policy update
-                if j % policy_delay == 0:
-                    # Delayed policy update
-                    outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
-                    logger.store(LossPi=outs[0])
-
-
-            logger.store(EpRet=ep_ret, EpLen=ep_len,
-                         EpVarUncertainty=ep_a_var_uncertainty,
-                         EpVarUncertaintyClipped=ep_a_var_uncertainty_clipped,
-                         EpStdUncertainty=ep_a_std_uncertainty,
-                         EpStdUncertaintyClipped=ep_a_std_uncertainty_clipped
-                         )
-            o, r, d, ep_ret, ep_len, \
-            ep_a_var_uncertainty, ep_a_var_uncertainty_clipped, \
-            ep_a_std_uncertainty, ep_a_std_uncertainty_clipped = env.reset(), 0, False, 0, 0, 0, 0, 0, 0
+            logger.store(EpRet=ep_ret, EpLen=ep_len)
+            logger.store(EpUnc=ep_unc)
+            o, r, d, ep_ret, ep_len, ep_unc = env.reset(), 0, False, 0, 0, 0
 
         # End of epoch wrap-up
         if t > 0 and t % steps_per_epoch == 0:
@@ -373,12 +470,10 @@ def ude_ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=
             logger.log_tabular('TestEpLen', average_only=True)
             logger.log_tabular('TotalEnvInteracts', t)
             logger.log_tabular('QVals', with_min_and_max=True)
+            logger.log_tabular('QLogVars', with_min_and_max=True)
             logger.log_tabular('LossPi', average_only=True)
             logger.log_tabular('LossQ', average_only=True)
-            logger.log_tabular('EpVarUncertainty', with_min_and_max=True)
-            logger.log_tabular('EpVarUncertaintyClipped', with_min_and_max=True)
-            logger.log_tabular('EpStdUncertainty', with_min_and_max=True)
-            logger.log_tabular('EpStdUncertaintyClipped', with_min_and_max=True)
+            logger.log_tabular('EpUnc', with_min_and_max=True)
             logger.log_tabular('Time', time.time()-start_time)
             logger.dump_tabular()
 
@@ -390,54 +485,38 @@ if __name__ == '__main__':
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--without_start_steps', action='store_true')
+    parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--exp_name', type=str, default='ude_ddpg')
-    parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
-
-    parser.add_argument("--exploration-strategy", type=str, choices=["action_noise", "epsilon_greedy"],
-                        default='epsilon_greedy', help='action_noise or epsilon_greedy')
-    parser.add_argument("--epsilon-max", type=float, default=1.0, help='maximum of epsilon')
-    parser.add_argument("--epsilon-min", type=float, default=.01, help='minimum of epsilon')
-    parser.add_argument("--epsilon-decay", type=float, default=.001, help='epsilon decay')
-
-    parser.add_argument('--n_post_action', type=int, default=10)
-    parser.add_argument('--sample_action_with_dropout', action='store_true')
-    parser.add_argument('--dropout_rate', type=float, default=0.1)
-    parser.add_argument('--action_choose_method', choices=['random_sample',
-                                                           'gaussian_sample',
-                                                           'mean_and_variance_based_noise',
-                                                           'median_and_variance_based_noise',
-                                                           'prediction_and_variance_based_noise'],
-                        default='median_and_variance_based_noise')
-    parser.add_argument('--uncertainty_noise_type', type=str, choices=['var_noise', 'std_noise'],
-                        default='var_noise')
-    parser.add_argument('--a_var_clip_max', type=float, default=1.0)
-    parser.add_argument('--a_var_clip_min', type=float, default=0.1)
-    parser.add_argument('--a_std_clip_max', type=float, default=1.0)
-    parser.add_argument('--a_std_clip_min', type=float, default=0.1)
-
-    parser.add_argument("--data_dir", type=str, default=None)
-
+    parser.add_argument('--reward_scale', type=int, default=1)
+    parser.add_argument('--uncertainty_driven_exploration',  action='store_true')
+    parser.add_argument('--n_post', type=int, default=100)
+    parser.add_argument('--concentration_factor', type=float, default=0.5)
+    parser.add_argument('--uncertainty_policy_delay', type=int, default=5000)
+    parser.add_argument('--act_noise', type=float, default=0.1)
+    parser.add_argument('--batch_size', type=int, default=100)
     args = parser.parse_args()
 
+    # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
-    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, datestamp=True)
-
-    # if args.hardcopy_target_nn:
-    #     polyak = 0
-
+    data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
+                        'spinup_data')
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
+    
     ude_ddpg(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
-             ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
-             gamma=args.gamma, seed=args.seed, epochs=args.epochs,
-             n_post_action=args.n_post_action,
-             sample_action_with_dropout=args.sample_action_with_dropout,
-             dropout_rate=args.dropout_rate,
-             action_choose_method=args.action_choose_method,
-             uncertainty_noise_type=args.uncertainty_noise_type,
-             a_var_clip_max=args.a_var_clip_max, a_var_clip_min=args.a_var_clip_min,
-             a_std_clip_max=args.a_std_clip_max, a_std_clip_min=args.a_std_clip_min,
-             logger_kwargs=logger_kwargs)
+                ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
+                without_start_steps=args.without_start_steps,
+                without_delay_train=args.without_delay_train,
+                gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+             reward_scale=args.reward_scale,
+                uncertainty_driven_exploration=args.uncertainty_driven_exploration,
+                n_post=args.n_post,
+                concentration_factor=args.concentration_factor,
+                uncertainty_policy_delay=args.uncertainty_policy_delay,
+                act_noise=args.act_noise,
+             batch_size=args.batch_size,
+                logger_kwargs=logger_kwargs)
 
-# python  spinup/algos/ddpg/ddpg.py --env HalfCheetah-v2 --seed 3 --l 2 --exp_name ddpg_two_layers_delay_policy
-# python  spinup/algos/ddpg/ddpg.py --env Ant-v2 --seed 3 --l 2 --exp_name ddpg_Ant_v2_two_layers_delay_policy
-# python  spinup/algos/ddpg/ddpg.py --env Humanoid-v2 --seed 3 --l 2 --exp_name ddpg_Humanoid_v2_two_layers_delay_policy
+# python ./spinup/algos/td3/td3.py --env HalfCheetah-v2 --seed 3 --l 2 --exp_name td3_two_layers
+# python ./spinup/algos/td3/td3.py --env Ant-v2 --seed 3 --l 2 --exp_name td3_Ant_v2_two_layers

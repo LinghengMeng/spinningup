@@ -4,9 +4,9 @@ import tensorflow as tf
 class VariationalDense:
     """Variational Dense Layer Class"""
     def __init__(self, n_in, n_out, dropout_mask_ph,
-                 model_prob=0.9, model_lam=1e-2, activation=None, name="hidden"):
+                 model_prob=0.9, model_lam=3e-4, activation=None, name="hidden"):
         self.model_prob = model_prob    # probability to keep units
-        self.model_lam = model_lam      # l^2 / 2*tau
+        self.model_lam = model_lam      # l^2 / 2*tau: l=1e-2, tau=[0.1, 0.15, 0.2]
 
         self.dropout_mask_ph = dropout_mask_ph # placeholder: p_s * i_s
         self.p_s = tf.shape(self.dropout_mask_ph)[0] # post sample size
@@ -72,6 +72,7 @@ def placeholder(dim=None):
 def placeholders(*args):
     return [placeholder(dim) for dim in args]
 
+# TODO: add batch normalization
 def mlp_variational(x, dropout_mask_phs, hidden_sizes=(32,),
                     activation=tf.tanh, output_activation=None, dropout_rate=0.1):
 
@@ -82,7 +83,7 @@ def mlp_variational(x, dropout_mask_phs, hidden_sizes=(32,),
     # tile x from shape (b_s * i_s) to (p_s * b_s * i_s)
     post_size = tf.shape(dropout_mask_phs[0])[0]
     x = tf.tile(tf.reshape(x, [1, tf.shape(x)[0], tf.shape(x)[1]]), [post_size, 1, 1])
-
+    # TODO: no dropout on input
     regularization = 0
     # Create hidden layers
     for layer_i in range(1,len(layer_sizes)-1):
@@ -90,7 +91,7 @@ def mlp_variational(x, dropout_mask_phs, hidden_sizes=(32,),
                                         n_out=layer_sizes[layer_i],
                                         dropout_mask_ph=dropout_mask_phs[layer_i-1],
                                         model_prob=1.0 - dropout_rate,
-                                        model_lam=1e-2,
+                                        model_lam=3e-4,
                                         activation=activation,
                                         name="h{}".format(layer_i + 1))
         x = hidden_layer(x)
@@ -101,7 +102,7 @@ def mlp_variational(x, dropout_mask_phs, hidden_sizes=(32,),
                                  n_out=layer_sizes[-1],
                                  dropout_mask_ph=dropout_mask_phs[-1],
                                  model_prob=1.0-dropout_rate,
-                                 model_lam=1e-2,
+                                 model_lam=3e-4,
                                  activation=output_activation,
                                  name="Out")
     x = out_layer(x)
