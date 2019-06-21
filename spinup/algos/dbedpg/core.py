@@ -3,8 +3,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from spinup.utils.logx import Logger
 import ray
-if not ray.is_initialized():
-    ray.init(num_gpus=1)
+# if not ray.is_initialized():
+#     ray.init(num_gpus=1)
 
 def get_vars(scope):
     return [x for x in tf.global_variables() if scope in x.name]
@@ -99,7 +99,6 @@ class MLP(tf.keras.Model):
             x = h_layer(x)
         return self.out_layer(x)
 
-@ray.remote
 class ActorCritic():
     """
     Class used for create an Actor-Critic.
@@ -224,10 +223,9 @@ class BootstrappedActorCriticEnsemble():
 
         # Create actor-critic ensemble
         self.ensemble_size = ensemble_size
-        self.ensemble = [ActorCritic.remote('act_{}'.format(i),
-                                            self.obs_dim, self.act_dim, self.act_limit, self.hidden_sizes,
-                                            self.gamma, self.pi_lr, self.q_lr, self.polyak)
-                                  for i in range(self.ensemble_size)]
+        self.ensemble = [ActorCritic('act_{}'.format(i), self.obs_dim, self.act_dim, self.act_limit, self.hidden_sizes,
+                                     self.gamma, self.pi_lr, self.q_lr, self.polyak)
+                         for i in range(self.ensemble_size)]
 
         # Create Replay Buffer
         self.ensemble_replay_bufs = [ReplayBuffer(self.obs_dim, self.act_dim, self.replay_size,
@@ -236,9 +234,7 @@ class BootstrappedActorCriticEnsemble():
                                      for ac_i in range(self.ensemble_size)]
 
     def predict(self, input):
-        predics_id, _ = ray.wait([self.ensemble[i].predict.remote(input) for i in range(self.ensemble_size)],
-                                 num_returns=self.ensemble_size)
-        predics = ray.get(predics_id)
+        predics = [self.ensemble[i].predict(input) for i in range(self.ensemble_size)]
         return np.asarray(predics)
 
     def train(self, batch_size=100, raw_batch_size=500, uncertainty_based_minibatch=False):
@@ -246,14 +242,13 @@ class BootstrappedActorCriticEnsemble():
         batches = self._generate_mini_batch(batch_size, raw_batch_size, uncertainty_based_minibatch)
 
         # Train each member on its mini-batch
-        train_outs_id, _ = ray.wait([self.ensemble[i].train.remote(batches[i]) for i in range(self.ensemble_size)],
-                                    num_returns=self.ensemble_size)
-        ac_en_q_loss, ac_en_q, ac_en_pi_loss = [], [], []
-        for i in range(self.ensemble_size):
-            ac_en_q_loss.append(ray.get(train_outs_id[0])[0])
-            ac_en_q.append(ray.get(train_outs_id[0])[1])
-            ac_en_pi_loss.append(ray.get(train_outs_id[0])[2])
-        return np.asarray(ac_en_q_loss), np.asarray(ac_en_q), np.asarray(ac_en_pi_loss)
+        train_outs = [self.ensemble[i].train(batches[i]) for i in range(self.ensemble_size)]
+
+        train_outs = np.asarray(train_outs)
+        ac_en_q_loss = train_outs[:, 0]
+        ac_en_q = np.stack(train_outs[:,1], axis=0)
+        ac_en_pi_loss = train_outs[:, 2]
+        return ac_en_q_loss, ac_en_q, ac_en_pi_loss
 
     def _generate_mini_batch(self, batch_size=100, raw_batch_size=500, uncertainty_based_minibatch=False):
         random_mini_batches = [reply_buf.sample_batch(batch_size) for reply_buf in self.ensemble_replay_bufs]
@@ -266,6 +261,174 @@ class BootstrappedActorCriticEnsemble():
             if np.random.uniform(0, 1, 1) < self.replay_buf_bootstrap_p:
                 self.ensemble_replay_bufs[ac_i].store(obs, act, rew, next_obs, done,
                                                       step_index, epoch_index, time, **kwargs)
+
+# @ray.remote
+# class ActorCritic():
+#     """
+#     Class used for create an Actor-Critic.
+#     """
+#     def __init__(self, ac_name, obs_dim, act_dim, act_limit, hidden_sizes, gamma, pi_lr, q_lr, polyak):
+#         self.act_name = ac_name
+#         self.obs_dim = obs_dim
+#         self.act_dim = act_dim
+#         self.act_limit = act_limit
+#         self.obs_ph = tf.placeholder(dtype=tf.float32, shape=(None, self.obs_dim))
+#         self.act_ph = tf.placeholder(dtype=tf.float32, shape=(None, self.act_dim))
+#         self.rew_ph = tf.placeholder(dtype=tf.float32, shape=(None,))
+#         self.new_obs_ph = tf.placeholder(dtype=tf.float32, shape=(None, self.obs_dim))
+#         self.done_ph = tf.placeholder(dtype=tf.float32, shape=(None,))
+#
+#         self.hidden_sizes = hidden_sizes
+#
+#         self.actor_hidden_activation = tf.keras.activations.relu
+#         self.actor_output_activation = tf.keras.activations.tanh
+#         self.critic_hidden_activation = tf.keras.activations.relu
+#         self.critic_output_activation = tf.keras.activations.linear
+#         self.gamma = gamma
+#         self.pi_lr = pi_lr
+#         self.q_lr = q_lr
+#         self.polyak = polyak
+#
+#         # Actor and Critic
+#         with tf.variable_scope('{}_main'.format(ac_name)):
+#             self.actor = MLP(self.hidden_sizes + [self.act_dim],
+#                              hidden_activation=self.actor_hidden_activation,
+#                              output_activation=self.actor_output_activation)
+#             self.critic = MLP(self.hidden_sizes + [1],
+#                               hidden_activation=self.critic_hidden_activation,
+#                               output_activation=self.critic_output_activation)
+#             self.pi = self.act_limit * self.actor(self.obs_ph)
+#             self.q = tf.squeeze(self.critic(tf.concat([self.obs_ph, self.act_ph], axis=-1)), axis=1)
+#             self.q_pi = tf.squeeze(self.critic(tf.concat([self.obs_ph, self.pi], axis=-1)), axis=1)
+#
+#         # Target Actor and Target Critic
+#         with tf.variable_scope('{}_target'.format(ac_name)):
+#             self.actor_targ = MLP(self.hidden_sizes + [self.act_dim],
+#                                   hidden_activation=self.actor_hidden_activation,
+#                                   output_activation=self.actor_output_activation)
+#             self.critic_targ = MLP(self.hidden_sizes + [1],
+#                                    hidden_activation=self.critic_hidden_activation,
+#                                    output_activation=self.critic_output_activation)
+#             self.pi_targ = self.act_limit * self.actor_targ(self.new_obs_ph)
+#             self.q_pi_targ = tf.squeeze(self.critic_targ(tf.concat([self.new_obs_ph, self.pi_targ], axis=-1)), axis=1)
+#
+#         # Loss
+#         self.backup = tf.stop_gradient(self.rew_ph + self.gamma * (1 - self.done_ph) * self.q_pi_targ)
+#         self.pi_loss = -tf.reduce_mean(self.q_pi)
+#         self.q_loss = tf.reduce_mean((self.q - self.backup) ** 2)
+#
+#         # Optimization
+#         self.pi_optimizer = tf.train.AdamOptimizer(learning_rate=self.pi_lr)
+#         self.q_optimizer = tf.train.AdamOptimizer(learning_rate=self.q_lr)
+#         self.train_pi_op = self.pi_optimizer.minimize(self.pi_loss, var_list=self.actor.variables)
+#         self.train_q_op = self.q_optimizer.minimize(self.q_loss, var_list=self.critic.variables)
+#
+#         # Update Target
+#         self.target_update = tf.group([tf.assign(v_targ, self.polyak * v_targ + (1 - self.polyak) * v_main)
+#                                        for v_main, v_targ in zip(self.actor.variables + self.critic.variables,
+#                                                                  self.actor_targ.variables + self.critic_targ.variables)])
+#         # Initializing targets to match main variables
+#         self.target_init = tf.group([tf.assign(v_targ, v_main)
+#                                      for v_main, v_targ in zip(self.actor.variables + self.critic.variables,
+#                                                                self.actor_targ.variables + self.critic_targ.variables)])
+#
+#         # Create tf.Session
+#         self.sess = tf.Session()
+#         self.sess.run(tf.global_variables_initializer())
+#
+#         # Initialize target
+#         self.sess.run(self.target_init)
+#
+#     def train(self, batch):
+#         feed_dict = {self.obs_ph: batch['obs1'],
+#                      self.act_ph: batch['acts'],
+#                      self.rew_ph: batch['rews'],
+#                      self.new_obs_ph: batch['obs2'],
+#                      self.done_ph: batch['done']
+#                      }
+#
+#         # Train critic
+#         train_critic_ops = [self.q_loss, self.q, self.train_q_op]
+#         critic_outs = self.sess.run(train_critic_ops, feed_dict=feed_dict)
+#         ac_en_q_loss = critic_outs[0]
+#         ac_en_q = critic_outs[1]
+#         # Train actor
+#         train_actor_ops = [self.pi_loss, self.train_pi_op, self.target_update]
+#         actor_outs = self.sess.run(train_actor_ops, feed_dict=feed_dict)
+#         ac_en_pi_loss = actor_outs[0]
+#         return ac_en_q_loss, ac_en_q, ac_en_pi_loss
+#
+#     def predict(self, input):
+#         feed_dict = {self.obs_ph: input.reshape(1, -1)}
+#         return self.sess.run(self.pi, feed_dict=feed_dict)[0]
+#
+#     def save_model(self):
+#         # TODO
+#         pass
+#
+# class BootstrappedActorCriticEnsemble():
+#     def __init__(self,ensemble_size,
+#                  obs_dim, act_dim, act_limit, hidden_sizes,
+#                  gamma, pi_lr, q_lr, polyak,
+#                  replay_size, replay_buf_bootstrap_p, logger_kwargs):
+#         self.obs_dim = obs_dim
+#         self.act_dim = act_dim
+#         self.act_limit = act_limit
+#
+#         self.hidden_sizes = hidden_sizes
+#         self.replay_size = replay_size
+#         self.replay_buf_bootstrap_p = replay_buf_bootstrap_p
+#         self.logger_kwargs = logger_kwargs
+#
+#         self.gamma = gamma
+#         self.pi_lr = pi_lr
+#         self.q_lr = q_lr
+#         self.polyak = polyak
+#
+#         # Create actor-critic ensemble
+#         self.ensemble_size = ensemble_size
+#         self.ensemble = [ActorCritic.remote('act_{}'.format(i),
+#                                             self.obs_dim, self.act_dim, self.act_limit, self.hidden_sizes,
+#                                             self.gamma, self.pi_lr, self.q_lr, self.polyak)
+#                                   for i in range(self.ensemble_size)]
+#
+#         # Create Replay Buffer
+#         self.ensemble_replay_bufs = [ReplayBuffer(self.obs_dim, self.act_dim, self.replay_size,
+#                                                   logger_fname='exp_log_ac_{}.txt'.format(ac_i),
+#                                                   **self.logger_kwargs)
+#                                      for ac_i in range(self.ensemble_size)]
+#
+#     def predict(self, input):
+#         predics_id, _ = ray.wait([self.ensemble[i].predict.remote(input) for i in range(self.ensemble_size)],
+#                                  num_returns=self.ensemble_size)
+#         predics = ray.get(predics_id)
+#         return np.asarray(predics)
+#
+#     def train(self, batch_size=100, raw_batch_size=500, uncertainty_based_minibatch=False):
+#         # Generate mini-batch
+#         batches = self._generate_mini_batch(batch_size, raw_batch_size, uncertainty_based_minibatch)
+#
+#         # Train each member on its mini-batch
+#         train_outs_id, _ = ray.wait([self.ensemble[i].train.remote(batches[i]) for i in range(self.ensemble_size)],
+#                                     num_returns=self.ensemble_size)
+#         ac_en_q_loss, ac_en_q, ac_en_pi_loss = [], [], []
+#         for i in range(self.ensemble_size):
+#             ac_en_q_loss.append(ray.get(train_outs_id[0])[0])
+#             ac_en_q.append(ray.get(train_outs_id[0])[1])
+#             ac_en_pi_loss.append(ray.get(train_outs_id[0])[2])
+#         return np.asarray(ac_en_q_loss), np.asarray(ac_en_q), np.asarray(ac_en_pi_loss)
+#
+#     def _generate_mini_batch(self, batch_size=100, raw_batch_size=500, uncertainty_based_minibatch=False):
+#         random_mini_batches = [reply_buf.sample_batch(batch_size) for reply_buf in self.ensemble_replay_bufs]
+#         return random_mini_batches
+#
+#     def add_to_replay_buffer(self, obs, act, rew, next_obs, done,
+#                              step_index, epoch_index, time, **kwargs):
+#         """Add experience to each Actor-Critic's replay buffer with probability replay_buf_bootstrapp_p"""
+#         for ac_i in range(self.ensemble_size):
+#             if np.random.uniform(0, 1, 1) < self.replay_buf_bootstrap_p:
+#                 self.ensemble_replay_bufs[ac_i].store(obs, act, rew, next_obs, done,
+#                                                       step_index, epoch_index, time, **kwargs)
 # @ray.remote
 # class ActorCritic():
 #     """

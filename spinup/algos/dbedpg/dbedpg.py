@@ -118,7 +118,6 @@ def dbedpg(env_name, render_env=False, ac_kwargs=dict(), seed=0,
     def get_action(o, noise_scale, ac_i=0):
         ac_ensemble_preds = ac_ensemble.predict(o)
         #1. random actor-critic
-        a = ac_ensemble_preds[np.random.randint(0, ensemble_size, 1)[0], :]
         a = ac_ensemble_preds[ac_i, :]
         a += noise_scale * np.random.randn(act_dim)
         # 2. one actor-critic for each epoch
@@ -139,7 +138,9 @@ def dbedpg(env_name, render_env=False, ac_kwargs=dict(), seed=0,
                 o, r, d, _ = test_env.step(get_action(o, 0, ac_i))
                 ep_ret += r
                 ep_len += 1
-            logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
+            log_args = {'TestEpRetAC{}'.format(ac_i): ep_ret, 'TestEpLenAC{}'.format(ac_i): ep_len}
+            logger.store(**log_args)
+        return ['TestEpRetAC{}'.format(ac_i), 'TestEpLenAC{}'.format(ac_i)]
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -208,15 +209,20 @@ def dbedpg(env_name, render_env=False, ac_kwargs=dict(), seed=0,
             if (epoch % save_freq == 0) or (epoch == epochs-1):
                 logger.save_state({'env': env}, None)
 
-            # Test the performance of the deterministic version of the agent.
-            test_agent(n=2)
+            # Test the performance of the deterministic version of each agent in the ensemble.
+            test_epochs = 2
+            test_log_args_keys = []
+            for ac_i in range(ensemble_size):
+                log_args_keys = test_agent(test_epochs, ac_i)
+                test_log_args_keys.append(log_args_keys)
 
             # Log info about epoch
             logger.log_tabular('Epoch', epoch)
             logger.log_tabular('EpRet', with_min_and_max=True)
-            logger.log_tabular('TestEpRet', with_min_and_max=True)
             logger.log_tabular('EpLen', average_only=True)
-            logger.log_tabular('TestEpLen', average_only=True)
+            for log_args_kyes in test_log_args_keys:
+                logger.log_tabular(log_args_kyes[0], with_min_and_max=True)
+                logger.log_tabular(log_args_kyes[1], average_only=True)
             logger.log_tabular('TotalEnvInteracts', t)
             for i in range(ensemble_size):
                 logger.log_tabular('LossQ{}'.format(i), with_min_and_max=True)
