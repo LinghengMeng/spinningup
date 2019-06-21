@@ -2,25 +2,13 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="ace8f787-b0c2-4811-bd68-88a87403fa88" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/spinup/test_pybulletenvs.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/spinup/test_pybulletenvs_simple.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/spinningup.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/spinningup.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/DQN/dqn.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/DQN/dqn.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/spinup/algos/dbedpg/core.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/dbedpg/core.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/spinup/algos/dbedpg/dbedpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/dbedpg/dbedpg.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ddpg/ddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ddpg/ddpg.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/sddpg/Untitled.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/sddpg/Untitled.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/sddpg2/Untitled.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/sddpg2/Untitled.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/sddpg_simple/Untitled.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/sddpg_simple/Untitled.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/sddpg_simple2/Untitled.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/sddpg_simple2/Untitled.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/td3/td3.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/td3/td3.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ude_ddpg/core.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ude_ddpg/core.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ude_ddpg/ude_ddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ude_ddpg/ude_ddpg.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ude_td3/Uncertainty_Change_Trajectory.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ude_td3/Uncertainty_Change_Trajectory.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ude_td3_batchP/Uncertainty_Change_Trajectory.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ude_td3_batchP/Uncertainty_Change_Trajectory.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ude_td3_batchP/core.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ude_td3_batchP/core.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ude_td3_batchP/investigate_uncertainty.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ude_td3_batchP/investigate_uncertainty.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ude_td3_batchP/ude_td3_batchP.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ude_td3_batchP/ude_td3_batchP.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -34,67 +22,35 @@
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/spinup/algos/uncertainty_estimate/uncertainty_estimate.py">
+        <entry file="file://$PROJECT_DIR$/spinup/algos/dbedpg/dbedpg.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="2431">
-              <caret line="149" selection-start-line="149" selection-end-line="149" />
-              <folding>
-                <element signature="e#0#31#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/spinup/algos/ude_td3_new/ude_td3_new.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="4182">
-              <caret line="256" column="55" selection-start-line="256" selection-start-column="12" selection-end-line="256" selection-end-column="55" />
+            <state relative-caret-position="2499">
+              <caret line="158" column="41" selection-start-line="158" selection-start-column="41" selection-end-line="158" selection-end-column="41" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/../spinup_data/2019-03-14_ddpg/2019-03-14_10-55-48-ddpg_s3/progress.txt">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1207">
-              <caret line="71" column="40" selection-start-line="71" selection-start-column="40" selection-end-line="71" selection-end-column="40" />
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/spinup/algos/dbedpg/dbedpg.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="579">
-              <caret line="164" column="19" lean-forward="true" selection-start-line="164" selection-start-column="19" selection-end-line="164" selection-end-column="19" />
-              <folding>
-                <element signature="e#0#18#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/spinup/algos/dbedpg/core.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="4301">
-              <caret line="256" column="25" selection-start-line="256" selection-start-column="25" selection-end-line="256" selection-end-column="25" />
+            <state relative-caret-position="952">
+              <caret line="185" selection-start-line="185" selection-end-line="185" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
+                <element signature="e#12995#13008#0" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/spinup/algos/dbedpg/replay_buffer.py">
+        <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-19_dbedpg_replay_buf_bootstrap_p_1_randomACEachEpoch/2019-06-19_18-06-47-dbedpg_replay_buf_bootstrap_p_1_randomACEachEpoch_s3/progress.txt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="34">
-              <caret line="2" selection-start-line="2" selection-end-line="2" selection-end-column="49" />
+            <state relative-caret-position="119">
+              <caret line="7" column="18" selection-start-line="7" selection-end-line="7" selection-end-column="18" />
             </state>
           </provider>
         </entry>
@@ -110,8 +66,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>rnd_predictor</find>
-      <find>batch_size</find>
       <find>dropout_masks_set</find>
       <find>test_agent</find>
       <find>a_mlp</find>
@@ -140,6 +94,8 @@
       <find>env_fn</find>
       <find>sess</find>
       <find>BootstrappedActorCriticEnsemble</find>
+      <find>inspect</find>
+      <find>env</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -148,8 +104,6 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/spinup/algos/sddpg_simple/sddpg_simple.py" />
-        <option value="$PROJECT_DIR$/spinup/algos/sddpg2/sddpg2.py" />
         <option value="$PROJECT_DIR$/spinup/algos/elu_ddpg/sddpg.py" />
         <option value="$PROJECT_DIR$/spinup/algos/elu_ddpg/core.py" />
         <option value="$PROJECT_DIR$/spinup/algos/elu_ddpg/elu_ddpg.py" />
@@ -197,16 +151,18 @@
         <option value="$PROJECT_DIR$/spinup/algos/dqn/gym_wrappers.py" />
         <option value="$PROJECT_DIR$/spinup/algos/ude_td3_new/ude_td3_new.py" />
         <option value="$PROJECT_DIR$/spinup/algos/dqn/replay_buffer.py" />
-        <option value="$PROJECT_DIR$/spinup/algos/dbedpg/core.py" />
+        <option value="$PROJECT_DIR$/spinup/test_pybulletenvs.py" />
+        <option value="$PROJECT_DIR$/spinup/test_pybulletenvs_simple.py" />
         <option value="$PROJECT_DIR$/spinup/algos/dbedpg/dbedpg.py" />
+        <option value="$PROJECT_DIR$/spinup/algos/dbedpg/core.py" />
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds" extendedState="7">
-    <option name="x" value="-10" />
-    <option name="y" value="-10" />
-    <option name="width" value="1939" />
-    <option name="height" value="1049" />
+  <component name="ProjectFrameBounds" extendedState="6">
+    <option name="x" value="1920" />
+    <option name="y" value="-2" />
+    <option name="width" value="1920" />
+    <option name="height" value="1082" />
   </component>
   <component name="ProjectLevelVcsManager">
     <ConfirmationsSetting value="2" id="Add" />
@@ -216,871 +172,6 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
-      <pane id="Scope">
-        <subPane subId="Scope 'Project Files'; set:Project Files; class com.intellij.psi.search.scope.ProjectFilesScope">
-          <expand>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="d3pg" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="dbedpg" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="ddpg" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="ddpg_lp" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="ddpg_origional" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="dqn" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="elu_ddpg" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="elu_ddpg2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="sac" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="sddpg2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="ude_ddpg" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="ude_td3_new" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="ude_td3_new_pure" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="uncertainty_estimate" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="algos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="vpg" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="utils" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-03-13_ddpg" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-03-13_ddpg" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-03-13_00-32-59-ddpg_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-03-14_ddpg" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-03-14_ddpg" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-03-14_10-55-48-ddpg_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-03-18_ddpg_one_layer_delay_policy" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-04-26_ddpg_Ant_v2_2L" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-04-26_ddpg_Ant_v2_2L" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-04-26_09-28-50-ddpg_Ant_v2_2L_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-09_ddpg_Swimmer_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-09_ddpg_Swimmer_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-09_17-37-51-ddpg_Swimmer_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-10_ddpg_Swimmer_v2_actNoise_0" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-11_ddpg_Reacher_v2_actNoise_0" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-11_ddpg_Reacher_v2_logdet_invCov" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-11_ddpg_Reacher_v2_logdet_invCov" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-11_13-18-08-ddpg_Reacher_v2_logdet_invCov_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-17_ude_td3_batchP_HalfCheetah_v2_debug_RND_with_Reg_and_DropTrain_noWDealy_newLamda_DR_0_05" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-20_td3_concrete_dropout_debug" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-20_td3_concrete_dropout_debug" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-20_22-34-06-td3_concrete_dropout_debug_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-20_td3_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-20_td3_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-20_13-51-13-td3_Walker2d_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-22_td3_Ant_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-22_td3_Humanoid_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-22_td3_Humanoid_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-22_14-19-09-td3_Humanoid_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-23_ude_td3_batchP_Ant_v2_debug_RND_with_Reg_and_DropTrain_noWDealy_newLambda_DR_0_025" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-25_ude_td3_new_Ant_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-25_ude_td3_new_Ant_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-25_11-52-06-ude_td3_new_Ant_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-26_td3_new_Ant_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-26_td3_new_Ant_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-25_08-40-46-td3_new_Ant_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_ddpg_HalfCheetah_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_ddpg_HalfCheetah_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_09-52-16-ddpg_HalfCheetah_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_ddpg_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_ddpg_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_17-17-13-ddpg_Walker2d_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_td3_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_td3_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_18-37-22-td3_Walker2d_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_ude_ddpg_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_ude_td3_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_ude_td3_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_20-56-55-ude_td3_Walker2d_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_ude_td3_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_23-50-10-ude_td3_Walker2d_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_uncertainty_estimate" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_uncertainty_estimate" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-27_22-39-33-uncertainty_estimate_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-28_ude_td3_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-28_ude_td3_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-28_00-24-41-ude_td3_Walker2d_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-28_ude_td3_Walker2d_v2_minimum_explore" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-28_uncertainty_estimate_10000Data_40000TrainEp" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-28_uncertainty_estimate_10000Data_40000TrainEp" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-28_22-54-39-uncertainty_estimate_10000Data_40000TrainEp_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-28_uncertainty_estimate_10000Data_1000000TrainEp" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-28_uncertainty_estimate_10000Data_1000000TrainEp" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-28_20-28-30-uncertainty_estimate_10000Data_1000000TrainEp_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-29_ddpg_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-29_ddpg_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-29_11-29-35-ddpg_Walker2d_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-29_ddpg_Walker2d_v2_debug_aleatoricQ_conservative" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-29_td3_new_Ant_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-29_td3_new_Ant_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-29_11-10-00-td3_new_Ant_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-29_ude_td3_Ant_v2_UncPolicyDelay1000" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-30_ddpg_HalfCheetah_v2_debug_aleatoricQ_noMax" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-31_ddpg_HalfCheetah_v2_debug_aleatoricQ_Max20" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-31_ddpg_HalfCheetah_v2_debug_aleatoricQ_Max20" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-31_00-36-55-ddpg_HalfCheetah_v2_debug_aleatoricQ_Max20_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-31_uncertainty_estimate_100000Data_100000TrainEp" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-31_uncertainty_estimate_100000Data_100000TrainEp" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-05-31_16-35-03-uncertainty_estimate_100000Data_100000TrainEp_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-01_ddpg_HalfCheetah_v2_debug_duplicateObs" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-01_ddpg_HalfCheetah_v2_debug_duplicateObs" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-01_21-26-34-ddpg_HalfCheetah_v2_debug_duplicateObs_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-01_ddpg_HalfCheetah_v2_debug_duplicateObs" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-01_21-39-05-ddpg_HalfCheetah_v2_debug_duplicateObs_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-02_d3pg_debug" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-02_d3pg_debug" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-02_22-05-38-d3pg_debug_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-02_ddpg_Ant_v2_debug_DropoutActor0_05" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-02_ddpg_Ant_v2_debug_DropoutActor0_05" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-02_16-52-34-ddpg_Ant_v2_debug_DropoutActor0_05_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-02_ddpg_HalfCheetah_v2_debug_DropoutActor0" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-02_ddpg_HalfCheetah_v2_debug_DropoutActor0" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-02_11-33-36-ddpg_HalfCheetah_v2_debug_DropoutActor0_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-03_ddpg_Ant_v2_debug_DropoutActor0_025" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-03_ddpg_Ant_v2_debug_DropoutActor0_025" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-03_10-36-32-ddpg_Ant_v2_debug_DropoutActor0_025_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-04_uncertainty_estimate_100000Data_100000TrainEp_2Input_1Output" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-04_uncertainty_estimate_100000Data_100000TrainEp_2Input_1Output" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-04_00-20-26-uncertainty_estimate_100000Data_100000TrainEp_2Input_1Output_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-04_uncertainty_estimate_100000Data_100000TrainEp_2Input_5Output" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-04_uncertainty_estimate_100000Data_100000TrainEp_2Input_5Output" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-04_09-47-38-uncertainty_estimate_100000Data_100000TrainEp_2Input_5Output_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-04_uncertainty_estimate_100000Data_100000TrainEp_2Input_5Output" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-04_20-11-10-uncertainty_estimate_100000Data_100000TrainEp_2Input_5Output_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-05_ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-05_ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-05_12-17-44-ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-06_ude_td3_new_Ant_v2_debug_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-06_ude_td3_new_Ant_v2_debug_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-06_08-24-33-ude_td3_new_Ant_v2_debug_uncOnRandomNet_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-06_ude_td3_new_HalfCheetah_v2_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-06_ude_td3_new_HalfCheetah_v2_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-06_11-57-13-ude_td3_new_HalfCheetah_v2_uncOnRandomNet_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-07_ude_td3_new_Ant_v2_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-07_ude_td3_new_Ant_v2_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-07_08-17-38-ude_td3_new_Ant_v2_uncOnRandomNet_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-08_ude_td3_new_Walker2d_v2_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-08_ude_td3_new_Walker2d_v2_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-08_09-47-31-ude_td3_new_Walker2d_v2_uncOnRandomNet_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-09_ude_td3_new_Hopper_v2_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-10_ddpg_lp_debug_Ant_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-10_ddpg_lp_debug_Walker2d_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-10_ude_td3_new_Swimmer_v2_uncOnRandomNet" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-11_uncertainty_estimate_100000Data_100000TrainEp_6Input_5Output_MLPNoReg_debugUncertaintyBasedMiniBatch" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-11_uncertainty_estimate_100000Data_100000TrainEp_6Input_5Output_MLPNoReg_debugUncertaintyBasedMiniBatch" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-11_00-26-20-uncertainty_estimate_100000Data_100000TrainEp_6Input_5Output_MLPNoReg_debugUncertaintyBasedMiniBatch_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-11_uncertainty_estimate_100000Data_100000TrainEp_6Input_5Output_MLPNoReg_debugUncertaintyBasedMiniBatch" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-11_16-19-29-uncertainty_estimate_100000Data_100000TrainEp_6Input_5Output_MLPNoReg_debugUncertaintyBasedMiniBatch_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-12_uncertainty_estimate_UncBasedBatch_XDim8" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-12_uncertainty_estimate_UncBasedBatch_XDim8" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-12_01-17-43-uncertainty_estimate_UncBasedBatch_XDim8_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-12_uncertainty_estimate_XDim8" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-12_uncertainty_estimate_XDim8" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-12_01-23-23-uncertainty_estimate_XDim8_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-14_dqn_atari" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-14_dqn_atari" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-14_14-42-58-dqn_atari_s0" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-14_dqn_atari" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-14_15-18-09-dqn_atari_s0" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-14_dqn_atari" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-14_15-18-09-dqn_atari_s0" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="videos" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-15_dbedpg_debug" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-15_dbedpg_debug" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-15_18-42-03-dbedpg_debug_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-16_dbedpg_HalfCheetah_randomAC" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="2019-06-16_dbedpg_HalfCheetah_unvertaintySampledAction" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="sac_2L_200Ep" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="sac_2L_200Ep" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="sac_2L_200Ep_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="sac_Humanoid_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="sac_Humanoid_v2" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="sac_Humanoid_v2_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="td3_2L_200Ep" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="td3_2L_200Ep" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="td3_2L_200Ep_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="td3_Ant_v2_two_layers" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-            <path>
-              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
-              <item name="C:\Users\pc-admin\Github Repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
-              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="td3_Ant_v2_two_layers" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-              <item name="td3_Ant_v2_two_layers_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
-            </path>
-          </expand>
-          <select />
-        </subPane>
-      </pane>
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -1092,13 +183,63 @@
           <select />
         </subPane>
       </pane>
+      <pane id="Scope">
+        <subPane subId="Scope 'Project Files'; set:Project Files; class com.intellij.psi.search.scope.ProjectFilesScope">
+          <expand>
+            <path>
+              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
+              <item name="~/Documents/git_repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
+              <item name="~/Documents/git_repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
+              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
+              <item name="~/Documents/git_repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
+              <item name="spinningup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
+              <item name="spinup" type="9f88c78c:ScopeViewTreeModel$FileNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
+              <item name="~/Documents/git_repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
+              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
+              <item name="~/Documents/git_repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
+              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
+              <item name="2019-06-19_dbedpg_replay_buf_bootstrap_p_1_randomACEachEpoch" type="9f88c78c:ScopeViewTreeModel$FileNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
+              <item name="~/Documents/git_repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
+              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
+              <item name="2019-06-20_dbedpg_debug" type="9f88c78c:ScopeViewTreeModel$FileNode" />
+            </path>
+            <path>
+              <item name="spinningup" type="3d21c010:ScopeViewTreeModel$ProjectNode" />
+              <item name="~/Documents/git_repos" type="442cc68d:ScopeViewTreeModel$RootNode" />
+              <item name="spinup_data" type="9f88c78c:ScopeViewTreeModel$FileNode" />
+              <item name="2019-06-20_dbedpg_debug" type="9f88c78c:ScopeViewTreeModel$FileNode" />
+              <item name="2019-06-20_16-32-20-dbedpg_debug_s3" type="9f88c78c:ScopeViewTreeModel$FileNode" />
+            </path>
+          </expand>
+          <select />
+        </subPane>
+      </pane>
     </panes>
   </component>
   <component name="PropertiesComponent">
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
     <property name="WebServerToolWindowFactoryState" value="true" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
-    <property name="settings.editor.selected.configurable" value="Docker" />
+    <property name="node.js.detected.package.eslint" value="true" />
+    <property name="node.js.path.for.package.eslint" value="project" />
+    <property name="node.js.selected.package.eslint" value="(autodetect)" />
+    <property name="settings.editor.selected.configurable" value="configurable.group.project" />
+    <property name="settings.editor.splitter.proportion" value="0.3294909" />
   </component>
   <component name="PyConsoleOptionsProvider">
     <option name="myPythonConsoleState">
@@ -1134,7 +275,29 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Docker.Docker Image">
+  <component name="RunManager" selected="Python tests.pytest in test_pybulletenvs.py">
+    <configuration name="dbedpg" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="spinningup" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/spinup/algos/dbedpg" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/spinup/algos/dbedpg/dbedpg.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="dropout_bayesian_approximation_tensorflow" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="spinningup" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -1149,50 +312,6 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/../Dropout-as-a-Bayesian-Approximation/dropout_bayesian_approximation_tensorflow.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="relearning_policy" type="PythonConfigurationType" factoryName="Python" temporary="true">
-      <module name="spinningup" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/spinup/algos/vd3_delayed_dropout" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/spinup/algos/vd3_delayed_dropout/relearning_policy.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="test_2" type="PythonConfigurationType" factoryName="Python" temporary="true">
-      <module name="spinningup" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/../Dropout-as-a-Bayesian-Approximation" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/../Dropout-as-a-Bayesian-Approximation/test_2.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -1235,13 +354,29 @@
       </deployment>
       <method v="2" />
     </configuration>
+    <configuration name="pytest in test_pybulletenvs.py" type="tests" factoryName="py.test" temporary="true" nameIsGenerated="true">
+      <module name="spinningup" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/spinup" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="_new_keywords" value="&quot;&quot;" />
+      <option name="_new_additionalArguments" value="&quot;&quot;" />
+      <option name="_new_target" value="&quot;$PROJECT_DIR$/spinup/test_pybulletenvs.py&quot;" />
+      <option name="_new_targetType" value="&quot;PATH&quot;" />
+      <method v="2" />
+    </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python tests.pytest in test_pybulletenvs.py" />
+        <item itemvalue="Python.dbedpg" />
         <item itemvalue="Docker.Docker Image" />
         <item itemvalue="Docker.Docker Image" />
         <item itemvalue="Python.dropout_bayesian_approximation_tensorflow" />
-        <item itemvalue="Python.test_2" />
-        <item itemvalue="Python.ude_td3" />
       </list>
     </recent_temporary>
   </component>
@@ -1257,11 +392,23 @@
       <updated>1552529307595</updated>
       <workItem from="1560711806615" duration="306000" />
       <workItem from="1560732560557" duration="593000" />
+      <workItem from="1560957649077" duration="749000" />
+      <workItem from="1560958422179" duration="2858000" />
+      <workItem from="1560967551752" duration="13343000" />
+      <workItem from="1561007344803" duration="1533000" />
+      <workItem from="1561039102917" duration="13599000" />
+      <workItem from="1561061533452" duration="504000" />
+      <workItem from="1561062680003" duration="3053000" />
     </task>
     <servers />
   </component>
+  <component name="TestHistory">
+    <history-entry file="pytest_in_test_pybulletenvs_py - 2019.06.19 at 15h 10m 23s.xml">
+      <configuration name="pytest in test_pybulletenvs.py" configurationId="tests" />
+    </history-entry>
+  </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="4497000" />
+    <option name="totallyTimeSpent" value="40136000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -1273,23 +420,22 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="-7" y="-7" width="1550" height="838" extended-state="7" />
-    <editor active="true" />
+    <frame x="1920" y="-2" width="1920" height="1082" extended-state="6" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49864864" visible="true" weight="0.2627346" />
+      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49864864" visible="true" weight="0.17662753" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" sideWeight="0.50135136" side_tool="true" weight="0.30085146" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" />
-      <window_info anchor="bottom" id="Run" order="2" weight="0.41747022" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.5349507" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.39943343" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" weight="0.3295519" />
-      <window_info anchor="bottom" id="Version Control" order="7" weight="0.3295519" />
-      <window_info anchor="bottom" id="Terminal" order="8" sideWeight="0.5108799" weight="0.7553041" />
+      <window_info anchor="bottom" id="Version Control" order="7" weight="0.3292232" />
+      <window_info active="true" anchor="bottom" id="Terminal" order="8" sideWeight="0.5108799" visible="true" weight="0.9684874" />
       <window_info anchor="bottom" id="Event Log" order="9" sideWeight="0.48912016" side_tool="true" weight="0.40876946" />
-      <window_info anchor="bottom" id="Python Console" order="10" weight="0.49080622" />
+      <window_info anchor="bottom" id="Python Console" order="10" weight="0.41694078" />
       <window_info anchor="bottom" id="Docker" order="11" show_stripe_button="false" weight="0.43564355" />
       <window_info anchor="bottom" id="Database Changes" order="12" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
@@ -1333,65 +479,14 @@
       </breakpoints>
     </breakpoint-manager>
   </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/spinningup$dbedpg.coverage" NAME="dbedpg Coverage Results" MODIFIED="1560960608461" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/spinup/algos/dbedpg" />
+    <SUITE FILE_PATH="coverage/spinningup$pytest_in_test_pybulletenvs_py.coverage" NAME="pytest in test_pybulletenvs.py Coverage Results" MODIFIED="1560971420926" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/spinup" />
+  </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/spinup/algos/td3/core.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state>
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-03-13_ddpg/2019-03-13_00-32-59-ddpg_s3/config.json">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-05-27_ude_ddpg_Ant_v2/2019-05-27_07-18-12-ude_ddpg_Ant_v2_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-2524" />
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-02_ddpg_Ant_v2_debug_DropoutActor0_05/2019-06-02_16-52-34-ddpg_Ant_v2_debug_DropoutActor0_05_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-2745" />
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-05-20_td3_HalfCheetah_v2/2019-05-20_23-03-16-td3_HalfCheetah_v2_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-2551" />
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/td3_2L_200Ep/td3_2L_200Ep_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state>
-          <caret line="62" column="8" selection-start-line="62" selection-start-column="4" selection-end-line="62" selection-end-column="8" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/spinup/algos/ude_td3/investigate_uncertainty.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1428">
-          <caret line="84" column="62" selection-start-line="84" selection-start-column="31" selection-end-line="84" selection-end-column="62" />
-          <folding>
-            <element signature="e#0#23#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/spinup/algos/ude_td3_new/UncertaintyOnRND.py" />
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-05_ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet/2019-06-05_12-17-44-ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet_s3/unc_on_random_net_actor.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1053830">
-          <caret line="61990" column="17" lean-forward="true" selection-start-line="61990" selection-start-column="17" selection-end-line="61990" selection-end-column="17" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-05_ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet/2019-06-05_12-17-44-ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-05_ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet/2019-06-05_12-17-44-ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet_s3/experiences_log.txt">
-      <provider selected="true" editor-type-id="LargeFileEditor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-05_ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet/2019-06-05_12-17-44-ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet_s3/unc_on_random_net_actor.txt" />
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-05_ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet/2019-06-05_12-17-44-ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet_s3/progress.txt" />
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-05_ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet/2019-06-05_12-17-44-ude_td3_new_HalfCheetah_v2_debug_uncOnRandomNet_s3/experiences_log.txt" />
     <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg_lp/ddpg.py" />
     <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg/ddpg.py">
       <provider selected="true" editor-type-id="text-editor">
@@ -1403,25 +498,13 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-03-13_ddpg/2019-03-13_00-32-59-ddpg_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="731">
-          <caret line="58" column="32" lean-forward="true" selection-start-line="58" selection-start-column="32" selection-end-line="58" selection-end-column="32" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-03-13_ddpg/2019-03-13_00-32-59-ddpg_s3/progress.txt" />
     <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-08_ddpg_lp_debug/2019-06-08_12-22-14-ddpg_lp_debug_s3/progress.txt" />
     <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-08_ddpg_lp_debug/2019-06-08_12-20-56-ddpg_lp_debug_s3/progress.txt" />
     <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-08_ddpg_lp_debug/2019-06-08_12-20-16-ddpg_lp_debug_s3/progress.txt" />
     <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-06_ude_td3_new_HalfCheetah_v2_uncOnRandomNet/2019-06-06_10-22-12-ude_td3_new_HalfCheetah_v2_uncOnRandomNet_s3/progress.txt" />
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-06_ude_td3_new_HalfCheetah_v2_uncOnRandomNet/2019-06-06_11-57-13-ude_td3_new_HalfCheetah_v2_uncOnRandomNet_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-2596" />
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-08_ddpg_lp_debug/2019-06-08_01-03-43-ddpg_lp_debug_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-06_ude_td3_new_HalfCheetah_v2_uncOnRandomNet/2019-06-06_11-57-13-ude_td3_new_HalfCheetah_v2_uncOnRandomNet_s3/progress.txt" />
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-08_ddpg_lp_debug/2019-06-08_01-03-43-ddpg_lp_debug_s3/progress.txt" />
     <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg/core.py">
       <provider selected="true" editor-type-id="text-editor">
         <state>
@@ -1448,14 +531,8 @@
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-09_ddpg_lp_debug/2019-06-09_18-09-48-ddpg_lp_debug_s3/progress.txt" />
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-11_uncertainty_estimate_100000Data_100000TrainEp_6Input_5Output_MLPNoReg_debugUncertaintyBasedMiniBatch/2019-06-11_16-19-29-uncertainty_estimate_100000Data_100000TrainEp_6Input_5Output_MLPNoReg_debugUncertaintyBasedMiniBatch_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-43444" />
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-12_uncertainty_estimate_UncBasedBatch_XDim8/2019-06-12_01-17-43-uncertainty_estimate_UncBasedBatch_XDim8_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-11_uncertainty_estimate_100000Data_100000TrainEp_6Input_5Output_MLPNoReg_debugUncertaintyBasedMiniBatch/2019-06-11_16-19-29-uncertainty_estimate_100000Data_100000TrainEp_6Input_5Output_MLPNoReg_debugUncertaintyBasedMiniBatch_s3/progress.txt" />
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-12_uncertainty_estimate_UncBasedBatch_XDim8/2019-06-12_01-17-43-uncertainty_estimate_UncBasedBatch_XDim8_s3/progress.txt" />
     <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg_lp/core.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1094">
@@ -1497,16 +574,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/spinup/algos/dqn/core.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="68">
-          <caret line="4" column="60" selection-start-line="4" selection-start-column="11" selection-end-line="4" selection-end-column="60" />
-          <folding>
-            <element signature="e#0#23#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/spinup/algos/dqn/core.py" />
     <entry file="file://$PROJECT_DIR$/spinup/algos/dqn/gym_wrappers.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="136">
@@ -1517,16 +585,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/spinup/algos/dqn/dqn.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="510">
-          <caret line="228" lean-forward="true" selection-start-line="228" selection-end-line="228" />
-          <folding>
-            <element signature="e#0#6#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/spinup/algos/dqn/dqn.py" />
     <entry file="file://$PROJECT_DIR$/spinup/algos/uncertainty_estimate/core.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="587">
@@ -1585,13 +644,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-15_dbedpg_debug/2019-06-15_18-42-03-dbedpg_debug_s3/progress.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="170">
-          <caret line="10" lean-forward="true" selection-start-line="10" selection-end-line="10" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-15_dbedpg_debug/2019-06-15_18-42-03-dbedpg_debug_s3/progress.txt" />
     <entry file="file://$PROJECT_DIR$/spinup/algos/ude_ddpg/ude_ddpg.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="3485">
@@ -1602,32 +655,15 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/spinup/algos/dqn/replay_buffer.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="323">
-          <caret line="19" column="4" selection-start-line="19" selection-start-column="4" selection-end-line="19" selection-end-column="4" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-            <element signature="e#1718#1776#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-03-14_ddpg/2019-03-14_10-55-48-ddpg_s3/config.json">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/spinup/algos/dqn/replay_buffer.py" />
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-03-14_ddpg/2019-03-14_10-55-48-ddpg_s3/config.json" />
     <entry file="file://$PROJECT_DIR$/spinup/algos/dedpg/dedpg.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-2856" />
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-15_dbedpg_debug/2019-06-15_18-42-03-dbedpg_debug_s3/exp_log_ac_0.txt">
-      <provider selected="true" editor-type-id="LargeFileEditor">
-        <state relative-caret-position="391">
-          <caret line="23" column="120" selection-start-line="23" selection-start-column="120" selection-end-line="23" selection-end-column="120" />
-        </state>
-      </provider>
-    </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-15_dbedpg_debug/2019-06-15_18-42-03-dbedpg_debug_s3/exp_log_ac_0.txt" />
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-03-14_ddpg/2019-03-14_10-55-48-ddpg_s3/progress.txt" />
     <entry file="file://$PROJECT_DIR$/spinup/algos/uncertainty_estimate/uncertainty_estimate.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="2431">
@@ -1640,7 +676,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/spinup/algos/ude_td3_new/ude_td3_new.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="4182">
+        <state relative-caret-position="-3221">
           <caret line="256" column="55" selection-start-line="256" selection-start-column="12" selection-end-line="256" selection-end-column="55" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
@@ -1648,19 +684,29 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-03-14_ddpg/2019-03-14_10-55-48-ddpg_s3/progress.txt">
+    <entry file="file://$USER_HOME$/anaconda3/envs/tf_gpu/lib/python3.7/site-packages/gym/envs/registration.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1207">
-          <caret line="71" column="40" selection-start-line="71" selection-start-column="40" selection-end-line="71" selection-end-column="40" />
+        <state relative-caret-position="434">
+          <caret line="155" column="24" selection-start-line="155" selection-start-column="20" selection-end-line="155" selection-end-column="24" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/spinup/algos/dbedpg/core.py">
+    <entry file="file://$PROJECT_DIR$/spinup/test_pybulletenvs_simple.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="4301">
-          <caret line="256" column="25" selection-start-line="256" selection-start-column="25" selection-end-line="256" selection-end-column="25" />
+        <state relative-caret-position="51">
+          <caret line="3" lean-forward="true" selection-start-line="3" selection-end-line="3" />
           <folding>
-            <element signature="e#0#18#0" expanded="true" />
+            <element signature="e#1#19#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/spinup/test_pybulletenvs.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="595">
+          <caret line="35" column="41" lean-forward="true" selection-start-line="35" selection-start-column="41" selection-end-line="35" selection-end-column="41" />
+          <folding>
+            <element signature="e#0#9#0" expanded="true" />
           </folding>
         </state>
       </provider>
@@ -1672,12 +718,42 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-20_dbedpg_debug_ray/2019-06-20_11-16-27-dbedpg_debug_ray_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-20_dbedpg_debug_ray/2019-06-20_11-16-27-dbedpg_debug_ray_s3/exp_log_ac_0.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
     <entry file="file://$PROJECT_DIR$/spinup/algos/dbedpg/dbedpg.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="579">
-          <caret line="164" column="19" lean-forward="true" selection-start-line="164" selection-start-column="19" selection-end-line="164" selection-end-column="19" />
+        <state relative-caret-position="2499">
+          <caret line="158" column="41" selection-start-line="158" selection-start-column="41" selection-end-line="158" selection-end-column="41" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-19_dbedpg_replay_buf_bootstrap_p_1_randomACEachEpoch/2019-06-19_18-06-47-dbedpg_replay_buf_bootstrap_p_1_randomACEachEpoch_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="119">
+          <caret line="7" column="18" selection-start-line="7" selection-end-line="7" selection-end-column="18" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-20_dbedpg_debug/2019-06-20_16-32-20-dbedpg_debug_s3/exp_log_ac_18.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-20_dbedpg_debug/2019-06-20_16-32-20-dbedpg_debug_s3/progress.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/spinup/algos/dbedpg/core.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="952">
+          <caret line="185" selection-start-line="185" selection-end-line="185" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+            <element signature="e#12995#13008#0" />
           </folding>
         </state>
       </provider>

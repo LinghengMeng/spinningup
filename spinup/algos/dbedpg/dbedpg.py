@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import pybulletgym
 import roboschool
 import gym
 import time
@@ -107,19 +108,19 @@ def dbedpg(env_name, render_env=False, ac_kwargs=dict(), seed=0,
 
     hidden_sizes = list(ac_kwargs['hidden_sizes'])
     ac_ensemble = BootstrappedActorCriticEnsemble(ensemble_size,
-                                                 obs_dim, act_dim, act_limit, hidden_sizes,
-                                                 gamma, pi_lr, q_lr, polyak,
-                                                 replay_size, replay_buf_bootstrap_p, logger_kwargs)
+                                                  obs_dim, act_dim, act_limit, hidden_sizes,
+                                                  gamma, pi_lr, q_lr, polyak,
+                                                  replay_size, replay_buf_bootstrap_p, logger_kwargs)
 
     # # Setup model saving
     # logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q': q})
 
     def get_action(o, noise_scale, ac_i=0):
-        ac_ensemble_preds = ac_ensemble.prediction(o)
+        ac_ensemble_preds = ac_ensemble.predict(o)
         #1. random actor-critic
         a = ac_ensemble_preds[np.random.randint(0, ensemble_size, 1)[0], :]
         a = ac_ensemble_preds[ac_i, :]
-        # a += noise_scale * np.random.randn(act_dim)
+        a += noise_scale * np.random.randn(act_dim)
         # 2. one actor-critic for each epoch
         # a = ac_ensemble_preds[ac_i, :]
         # a += noise_scale * np.random.randn(act_dim)
