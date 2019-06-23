@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="ace8f787-b0c2-4811-bd68-88a87403fa88" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ddpg_dropout/generate_jobs.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ddpg_dropout/generate_jobs.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spinup/algos/ddpg_dropout/ddpg_dropout.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ddpg_dropout/ddpg_dropout.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -51,14 +51,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg_dropout/ddpg_dropout.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="95">
-              <caret line="333" column="34" selection-start-line="333" selection-start-column="27" selection-end-line="333" selection-end-column="34" />
-              <folding>
-                <element signature="e#0#21#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="68">
+              <caret line="4" column="18" selection-start-line="4" selection-start-column="18" selection-end-line="4" selection-end-column="18" />
             </state>
           </provider>
         </entry>
@@ -72,7 +69,7 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg_dropout/generate_jobs.ipynb">
           <provider selected="true" editor-type-id="jupyter-editor" />
         </entry>
@@ -479,7 +476,7 @@
       <workItem from="1561062680003" duration="3053000" />
       <workItem from="1561091405557" duration="17945000" />
       <workItem from="1561177802229" duration="37545000" />
-      <workItem from="1561264041281" duration="6428000" />
+      <workItem from="1561264041281" duration="7601000" />
     </task>
     <servers />
   </component>
@@ -489,7 +486,7 @@
     </history-entry>
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="102054000" />
+    <option name="totallyTimeSpent" value="103227000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -502,6 +499,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="67" y="25" width="1853" height="1055" extended-state="6" />
+    <editor active="true" />
     <layout>
       <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49864864" visible="true" weight="0.160487" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
@@ -853,16 +851,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg_dropout/ddpg_dropout.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="95">
-          <caret line="333" column="34" selection-start-line="333" selection-start-column="27" selection-end-line="333" selection-end-column="34" />
-          <folding>
-            <element signature="e#0#21#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-22_ddpg_dropout_dr_0_partialNotTrain_2L_newMLP/2019-06-23_00-28-29-ddpg_dropout_dr_0_partialNotTrain_2L_oldMLP_s0/progress.txt">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="314">
@@ -872,6 +860,13 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg_dropout/generate_jobs.ipynb">
       <provider selected="true" editor-type-id="jupyter-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg_dropout/ddpg_dropout.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="68">
+          <caret line="4" column="18" selection-start-line="4" selection-start-column="18" selection-end-line="4" selection-end-column="18" />
+        </state>
+      </provider>
     </entry>
   </component>
   <component name="masterDetails">

@@ -1,6 +1,8 @@
 import os.path as osp
 import numpy as np
 import tensorflow as tf
+import roboschool
+import pybulletgym
 import gym
 import time
 from spinup.algos.ddpg_dropout import core
