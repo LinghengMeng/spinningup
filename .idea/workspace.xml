@@ -66,8 +66,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-22_ddpg_dropout_dr_0_partialNotTrain_2L_newMLP/2019-06-23_00-28-29-ddpg_dropout_dr_0_partialNotTrain_2L_oldMLP_s0/progress.txt">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="119">
-              <caret line="28" column="5" selection-start-line="28" selection-start-column="5" selection-end-line="28" selection-end-column="5" />
+            <state relative-caret-position="314">
+              <caret line="23" column="4" selection-start-line="23" selection-start-column="4" selection-end-line="23" selection-end-column="4" />
             </state>
           </provider>
         </entry>
@@ -479,7 +479,7 @@
       <workItem from="1561062680003" duration="3053000" />
       <workItem from="1561091405557" duration="17945000" />
       <workItem from="1561177802229" duration="37545000" />
-      <workItem from="1561264041281" duration="2753000" />
+      <workItem from="1561264041281" duration="6428000" />
     </task>
     <servers />
   </component>
@@ -489,7 +489,7 @@
     </history-entry>
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="98379000" />
+    <option name="totallyTimeSpent" value="102054000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -502,9 +502,8 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="67" y="25" width="1853" height="1055" extended-state="6" />
-    <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" sideWeight="0.49864864" visible="true" weight="0.160487" />
+      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.49864864" visible="true" weight="0.160487" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" sideWeight="0.50135136" side_tool="true" weight="0.30085146" />
       <window_info anchor="bottom" id="Jupyter" weight="0.32972974" />
@@ -516,7 +515,7 @@
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" weight="0.3295519" />
       <window_info anchor="bottom" id="Version Control" order="7" weight="0.3292232" />
-      <window_info anchor="bottom" id="Terminal" order="8" sideWeight="0.5108799" visible="true" weight="0.33945945" />
+      <window_info active="true" anchor="bottom" id="Terminal" order="8" sideWeight="0.5108799" visible="true" weight="0.4616216" />
       <window_info anchor="bottom" id="Event Log" order="9" sideWeight="0.48912016" side_tool="true" weight="0.40876946" />
       <window_info anchor="bottom" id="Python Console" order="10" weight="0.4510691" />
       <window_info anchor="bottom" id="Docker" order="11" show_stripe_button="false" weight="0.43564355" />
@@ -854,13 +853,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-22_ddpg_dropout_dr_0_partialNotTrain_2L_newMLP/2019-06-23_00-28-29-ddpg_dropout_dr_0_partialNotTrain_2L_oldMLP_s0/progress.txt">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="119">
-          <caret line="28" column="5" selection-start-line="28" selection-start-column="5" selection-end-line="28" selection-end-column="5" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/spinup/algos/ddpg_dropout/ddpg_dropout.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="95">
@@ -868,6 +860,13 @@
           <folding>
             <element signature="e#0#21#0" expanded="true" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../spinup_data/2019-06-22_ddpg_dropout_dr_0_partialNotTrain_2L_newMLP/2019-06-23_00-28-29-ddpg_dropout_dr_0_partialNotTrain_2L_oldMLP_s0/progress.txt">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="314">
+          <caret line="23" column="4" selection-start-line="23" selection-start-column="4" selection-end-line="23" selection-end-column="4" />
         </state>
       </provider>
     </entry>

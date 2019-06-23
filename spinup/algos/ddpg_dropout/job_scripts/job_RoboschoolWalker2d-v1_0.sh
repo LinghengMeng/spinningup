@@ -8,4 +8,4 @@
 ## Main processing command
 module load cuda cudnn
 source ~/tf_gpu/bin/activate
-python ./dbedpg.py  --env RoboschoolWalker2d-v1 --new_mlp --dropout_rate 0 --exp_name dbedpg_RoboschoolWalker2d-v1_0
+python ./ddpg_dropout.py  --env RoboschoolWalker2d-v1 --new_mlp --dropout_rate 0 --exp_name dbedpg_RoboschoolWalker2d-v1_0
