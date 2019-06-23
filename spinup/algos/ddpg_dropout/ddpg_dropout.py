@@ -1,9 +1,10 @@
+import os.path as osp
 import numpy as np
 import tensorflow as tf
 import gym
 import time
 from spinup.algos.ddpg_dropout import core
-from spinup.algos.ddpg_dropout.core import get_vars
+from spinup.algos.ddpg_dropout.core import get_vars, BeroulliDropoutMLP, MLP
 from spinup.utils.logx import EpochLogger
 
 import os
@@ -44,7 +45,7 @@ class ReplayBuffer:
 Deep Deterministic Policy Gradient (DDPG)
 
 """
-def ddpg_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
+def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 0,
          steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, 
          polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000, 
          act_noise=0.1, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
@@ -135,15 +136,53 @@ def ddpg_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
     # Inputs to computation graph
     x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
+    hidden_sizes = list(ac_kwargs['hidden_sizes'])
+    actor_hidden_activation = tf.keras.activations.relu
+    actor_output_activation = tf.keras.activations.tanh
+    critic_hidden_activation = tf.keras.activations.relu
+    critic_output_activation = tf.keras.activations.linear
+
     # Main outputs from computation graph
     with tf.variable_scope('main'):
-        pi, q, q_pi = actor_critic(x_ph, a_ph, **ac_kwargs)
-    
+        if not new_mlp:
+            actor = BeroulliDropoutMLP(layer_sizes=hidden_sizes+[act_dim], dropout_rate=dropout_rate,
+                                       hidden_activation=actor_hidden_activation, output_activation=actor_output_activation)
+            critic = BeroulliDropoutMLP(layer_sizes=hidden_sizes+[1], dropout_rate=dropout_rate,
+                                        hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
+        else:
+            actor = MLP(layer_sizes=hidden_sizes+[act_dim], dropout_rate=dropout_rate,
+                        hidden_activation=actor_hidden_activation, output_activation=actor_output_activation)
+            critic = MLP(layer_sizes=hidden_sizes + [1], dropout_rate=dropout_rate,
+                         hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
+        # Set training=False to ignore dropout masks
+        pi = act_limit * actor(x_ph, training=False)
+        q = tf.squeeze(critic(tf.concat([x_ph,a_ph], axis=-1), training=False), axis=1)
+        q_pi = tf.squeeze(critic(tf.concat([x_ph, pi], axis=-1), training=False), axis=1)
+        # Set traininig=True to mask input for each hidden layer and output layer
+        pi_drop = act_limit * actor(x_ph, training=True)
+        q_drop = tf.squeeze(critic(tf.concat([x_ph, a_ph], axis=-1), training=True), axis=1)
+        q_pi_drop = tf.squeeze(critic(tf.concat([x_ph, pi], axis=-1), training=True), axis=1)
+
     # Target networks
     with tf.variable_scope('target'):
         # Note that the action placeholder going to actor_critic here is 
         # irrelevant, because we only need q_targ(s, pi_targ(s)).
-        pi_targ, _, q_pi_targ  = actor_critic(x2_ph, a_ph, **ac_kwargs)
+        if not new_mlp:
+            actor_targ = BeroulliDropoutMLP(layer_sizes=hidden_sizes + [act_dim], dropout_rate=dropout_rate,
+                                            hidden_activation=actor_hidden_activation,
+                                            output_activation=actor_output_activation)
+            critic_targ = BeroulliDropoutMLP(layer_sizes=hidden_sizes + [1], dropout_rate=dropout_rate,
+                                             hidden_activation=critic_hidden_activation,
+                                             output_activation=critic_output_activation)
+        else:
+            actor_targ = MLP(layer_sizes=hidden_sizes + [act_dim], dropout_rate=dropout_rate,
+                             hidden_activation=actor_hidden_activation, output_activation=actor_output_activation)
+            critic_targ = MLP(layer_sizes=hidden_sizes + [1], dropout_rate=dropout_rate,
+                              hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
+
+        # Set training=False to ignore dropout for backup target value
+        pi_targ = act_limit * actor_targ(x2_ph, training=False)
+        q_pi_targ = tf.squeeze(critic_targ(tf.concat([x2_ph, pi_targ], axis=-1), training=False), axis=1)
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
@@ -156,29 +195,33 @@ def ddpg_dropout(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
     backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*q_pi_targ)
 
     # DDPG losses
-    pi_loss = -tf.reduce_mean(q_pi)
-    q_loss = tf.reduce_mean((q-backup)**2)
+    # pi_loss = -tf.reduce_mean(q_pi)
+    # q_loss = tf.reduce_mean((q-backup)**2)
+    pi_loss = -tf.reduce_mean(q_pi_drop)
+    q_loss = tf.reduce_mean((q_drop - backup) ** 2)
 
     # Separate train ops for pi, q
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
     q_optimizer = tf.train.AdamOptimizer(learning_rate=q_lr)
-    train_pi_op = pi_optimizer.minimize(pi_loss, var_list=get_vars('main/pi'))
-    train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('main/q'))
+    train_pi_op = pi_optimizer.minimize(pi_loss, var_list=actor.variables)
+    train_q_op = q_optimizer.minimize(q_loss, var_list=critic.variables)
 
     # Polyak averaging for target variables
     target_update = tf.group([tf.assign(v_targ, polyak*v_targ + (1-polyak)*v_main)
-                              for v_main, v_targ in zip(get_vars('main'), get_vars('target'))])
+                              for v_main, v_targ in zip(actor.variables+critic.variables,
+                                                        actor_targ.variables+critic_targ.variables)])
 
     # Initializing targets to match main variables
     target_init = tf.group([tf.assign(v_targ, v_main)
-                              for v_main, v_targ in zip(get_vars('main'), get_vars('target'))])
+                              for v_main, v_targ in zip(actor.variables+critic.variables,
+                                                        actor_targ.variables+critic_targ.variables)])
 
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
     sess.run(target_init)
 
-    # Setup model saving
-    logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q': q})
+    # # Setup model saving
+    # logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q': q})
 
     def get_action(o, noise_scale):
         a = sess.run(pi, feed_dict={x_ph: o.reshape(1,-1)})[0]
@@ -286,8 +329,10 @@ if __name__ == '__main__':
     parser.add_argument('--l', type=int, default=1)
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
-    parser.add_argument('--epochs', type=int, default=50)
-    parser.add_argument('--exp_name', type=str, default='ddpg')
+    parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--exp_name', type=str, default='ddpg_dropout')
+    parser.add_argument('--new_mlp', action='store_true')
+    parser.add_argument('--dropout_rate', type=float, default=0)
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
 
     parser.add_argument("--exploration-strategy", type=str, choices=["action_noise", "epsilon_greedy"],
@@ -302,11 +347,15 @@ if __name__ == '__main__':
 
     from spinup.utils.run_utils import setup_logger_kwargs
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, args.data_dir, datestamp=True)
+    # Set log data saving directory
+    from spinup.utils.run_utils import setup_logger_kwargs
+    data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))), 'spinup_data')
+    logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
 
     if args.hardcopy_target_nn:
         polyak = 0
 
-    ddpg_dropout(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
+    ddpg_dropout(lambda : gym.make(args.env), new_mlp=args.new_mlp, dropout_rate=args.dropout_rate,
          ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
          gamma=args.gamma, seed=args.seed, epochs=args.epochs,
          logger_kwargs=logger_kwargs)
