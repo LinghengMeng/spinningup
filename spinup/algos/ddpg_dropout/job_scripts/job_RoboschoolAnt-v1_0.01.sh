@@ -8,4 +8,4 @@
 ## Main processing command
 module load cuda cudnn
 source ~/tf_gpu/bin/activate
-python ./dbedpg.py  --env RoboschoolAnt-v1 --dropout_rate 0.01 --exp_name dbedpg_RoboschoolAnt-v1_0.01
+python ./dbedpg.py  --env RoboschoolAnt-v1 --new_mlp --dropout_rate 0.01 --exp_name dbedpg_RoboschoolAnt-v1_0.01

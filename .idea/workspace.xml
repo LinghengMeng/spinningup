@@ -2,11 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="ace8f787-b0c2-4811-bd68-88a87403fa88" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/spinup/algos/ddpg_dropout/generate_jobs.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ddpg_dropout/core.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ddpg_dropout/core.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/algos/ddpg_dropout/ddpg_dropout.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ddpg_dropout/ddpg_dropout.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/spinup/utils/plot.py" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/utils/plot.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/spinup/algos/ddpg_dropout/generate_jobs.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/spinup/algos/ddpg_dropout/generate_jobs.ipynb" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -483,7 +479,7 @@
       <workItem from="1561062680003" duration="3053000" />
       <workItem from="1561091405557" duration="17945000" />
       <workItem from="1561177802229" duration="37545000" />
-      <workItem from="1561264041281" duration="2184000" />
+      <workItem from="1561264041281" duration="2753000" />
     </task>
     <servers />
   </component>
@@ -493,7 +489,7 @@
     </history-entry>
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="97810000" />
+    <option name="totallyTimeSpent" value="98379000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
