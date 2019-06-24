@@ -163,7 +163,10 @@ def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 
         # Set traininig=True to mask input for each hidden layer and output layer
         pi_drop = act_limit * actor(x_ph, training=True)
         q_drop = tf.squeeze(critic(tf.concat([x_ph, a_ph], axis=-1), training=True), axis=1)
-        q_pi_drop = tf.squeeze(critic(tf.concat([x_ph, pi], axis=-1), training=True), axis=1)
+        q_pi_drop = tf.squeeze(critic(tf.concat([x_ph, pi_drop], axis=-1), training=True), axis=1)
+
+        # q_drop = tf.squeeze(critic(tf.concat([x_ph, a_ph], axis=-1), training=False), axis=1)
+        # q_pi_drop = tf.squeeze(critic(tf.concat([x_ph, pi], axis=-1), training=False), axis=1)
 
     # Target networks
     with tf.variable_scope('target'):
@@ -197,10 +200,14 @@ def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 
     backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*q_pi_targ)
 
     # DDPG losses
+    # 1.
     # pi_loss = -tf.reduce_mean(q_pi)
     # q_loss = tf.reduce_mean((q-backup)**2)
+    # 2.
     pi_loss = -tf.reduce_mean(q_pi_drop)
     q_loss = tf.reduce_mean((q_drop - backup) ** 2)
+    # 3.
+    # pi_loss = -tf.reduce_mean(q_pi_drop)
 
     # Separate train ops for pi, q
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
