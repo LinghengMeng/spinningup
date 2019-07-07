@@ -4,9 +4,10 @@ import tensorflow as tf
 import roboschool
 import pybulletgym
 import gym
+import spinup.algos.ddpg_n_step.modified_envs
 import time
 from spinup.algos.ddpg_n_step import core
-from spinup.algos.ddpg_n_step.core import get_vars, BeroulliDropoutMLP, MLP
+from spinup.algos.ddpg_n_step.core import get_vars, MLP
 from spinup.utils.logx import EpochLogger
 
 import os
@@ -86,7 +87,7 @@ Deep Deterministic Policy Gradient (DDPG)
 """
 def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 0,
                  steps_per_epoch=5000, epochs=100, replay_size=int(1e6),
-                 n_step=1, gamma=0.99,
+                 n_step=1, gamma=0.99, without_delay_train=False,
                  polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000,
                  act_noise=0.1, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
@@ -186,34 +187,28 @@ def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 
 
     # Main outputs from computation graph
     with tf.variable_scope('main'):
-        actor = MLP(layer_sizes=hidden_sizes+[act_dim], dropout_rate=dropout_rate,
+        actor = MLP(layer_sizes=hidden_sizes+[act_dim],
                     hidden_activation=actor_hidden_activation, output_activation=actor_output_activation)
-        critic = MLP(layer_sizes=hidden_sizes + [1], dropout_rate=dropout_rate,
+        critic = MLP(layer_sizes=hidden_sizes + [1],
                      hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
         # Set training=False to ignore dropout masks
         pi = act_limit * actor(x_ph, training=False)
-        q = tf.squeeze(critic(tf.concat([x_ph,a_ph], axis=-1), training=False), axis=1)
-        q_pi = tf.squeeze(critic(tf.concat([x_ph, pi], axis=-1), training=False), axis=1)
-        # Set traininig=True to mask input for each hidden layer and output layer
-        pi_drop = act_limit * actor(x_ph, training=True)
-        q_drop = tf.squeeze(critic(tf.concat([x_ph, a_ph], axis=-1), training=True), axis=1)
-        # 1.
-        q_pi_drop = tf.squeeze(critic(tf.concat([x_ph, pi], axis=-1), training=True), axis=1)
-        # 2.
-        q_pi_drop = tf.squeeze(critic(tf.concat([x_ph, pi_drop], axis=-1), training=True), axis=1)
+        q = tf.squeeze(critic(tf.concat([x_ph,a_ph], axis=-1)), axis=1)
+        q_pi = tf.squeeze(critic(tf.concat([x_ph, pi], axis=-1)), axis=1)
+
 
     # Target networks
     with tf.variable_scope('target'):
         # Note that the action placeholder going to actor_critic here is 
         # irrelevant, because we only need q_targ(s, pi_targ(s)).
-        actor_targ = MLP(layer_sizes=hidden_sizes + [act_dim], dropout_rate=dropout_rate,
+        actor_targ = MLP(layer_sizes=hidden_sizes + [act_dim],
                          hidden_activation=actor_hidden_activation, output_activation=actor_output_activation)
-        critic_targ = MLP(layer_sizes=hidden_sizes + [1], dropout_rate=dropout_rate,
+        critic_targ = MLP(layer_sizes=hidden_sizes + [1],
                           hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
 
         # Set training=False to ignore dropout for backup target value
-        pi_targ = act_limit * actor_targ(x2_ph, training=False)
-        q_pi_targ = tf.squeeze(critic_targ(tf.concat([x2_ph, pi_targ], axis=-1), training=False), axis=1)
+        pi_targ = act_limit * actor_targ(x2_ph)
+        q_pi_targ = tf.squeeze(critic_targ(tf.concat([x2_ph, pi_targ], axis=-1)), axis=1)
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
@@ -223,20 +218,13 @@ def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 
     print('\nNumber of parameters: \t pi: %d, \t q: %d, \t total: %d\n'%var_counts)
 
     # Bellman backup for Q function
-    backup = tf.stop_gradient(tf.reduce_sum(tf.multiply([gamma**(i-1) for i in range(n_step)] * (1-d_ph), r_ph), axis=1)
-                              + gamma**n_step*(1-d_ph[:,-1])*q_pi_targ)
-    # backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*q_pi_targ)
+    backup = tf.stop_gradient(tf.reduce_sum(tf.multiply([gamma**(i) for i in range(n_step)] * (1-d_ph), r_ph), axis=1)
+                              + gamma**n_step*(1-d_ph[:, -1])*q_pi_targ)
 
     # DDPG losses
     # 1.
     pi_loss = -tf.reduce_mean(q_pi)
     q_loss = tf.reduce_mean((q-backup)**2)
-    # # 2.
-    # pi_loss = -tf.reduce_mean(q_pi_drop)
-    # q_loss = tf.reduce_mean((q_drop - backup) ** 2)
-    # # 3.
-    # pi_loss = -tf.reduce_mean(q_pi)
-    # q_loss = tf.reduce_mean((q_drop - backup) ** 2)
 
     # Separate train ops for pi, q
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
@@ -293,6 +281,8 @@ def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 
         else:
             a = env.action_space.sample()
 
+        # env.render()
+
         # Step the env
         o2, r, d, _ = env.step(a)
         state_noise_scale = 0.01
@@ -313,28 +303,45 @@ def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 
         # most recent observation!
         o = o2
 
+        if t > batch_size and without_delay_train:
+            batch = replay_buffer.sample_batch_n_step(batch_size, n_step=n_step)
+            feed_dict = {x_ph: batch['obs1'],
+                         x2_ph: batch['obs2'],
+                         a_ph: batch['acts'],
+                         r_ph: batch['rews'],
+                         d_ph: batch['done']
+                         }
+
+            # Q-learning update
+            outs = sess.run([q_loss, q, train_q_op], feed_dict)
+            logger.store(LossQ=outs[0], QVals=outs[1])
+
+            # Policy update
+            outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+            logger.store(LossPi=outs[0])
+
         if d or (ep_len == max_ep_len):
             """
             Perform all DDPG updates at the end of the trajectory,
             in accordance with tuning done by TD3 paper authors.
             """
-            for _ in range(ep_len):
-                # batch = replay_buffer.sample_batch(batch_size)
-                batch = replay_buffer.sample_batch_n_step(batch_size, n_step=n_step)
-                feed_dict = {x_ph: batch['obs1'],
-                             x2_ph: batch['obs2'],
-                             a_ph: batch['acts'],
-                             r_ph: batch['rews'],
-                             d_ph: batch['done']
-                            }
+            if not without_delay_train:
+                for _ in range(ep_len):
+                    batch = replay_buffer.sample_batch_n_step(batch_size, n_step=n_step)
+                    feed_dict = {x_ph: batch['obs1'],
+                                 x2_ph: batch['obs2'],
+                                 a_ph: batch['acts'],
+                                 r_ph: batch['rews'],
+                                 d_ph: batch['done']
+                                }
 
-                # Q-learning update
-                outs = sess.run([q_loss, q, train_q_op], feed_dict)
-                logger.store(LossQ=outs[0], QVals=outs[1])
+                    # Q-learning update
+                    outs = sess.run([q_loss, q, train_q_op], feed_dict)
+                    logger.store(LossQ=outs[0], QVals=outs[1])
 
-                # Policy update
-                outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
-                logger.store(LossPi=outs[0])
+                    # Policy update
+                    outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+                    logger.store(LossPi=outs[0])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -375,6 +382,7 @@ if __name__ == '__main__':
     parser.add_argument('--exp_name', type=str, default='ddpg_dropout')
     parser.add_argument('--new_mlp', action='store_true')
     parser.add_argument('--n_step', type=int, default=5)
+    parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--dropout_rate', type=float, default=0)
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
     parser.add_argument('--replay_size', type=int, default=int(1e6))
@@ -403,5 +411,6 @@ if __name__ == '__main__':
                  ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
                  n_step=args.n_step, replay_size=args.replay_size,
                  batch_size=args.batch_size,
+                 without_delay_train=args.without_delay_train,
                  gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                  logger_kwargs=logger_kwargs)
