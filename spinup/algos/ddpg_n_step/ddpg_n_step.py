@@ -1,8 +1,8 @@
 import os.path as osp
 import numpy as np
 import tensorflow as tf
-import roboschool
-import pybulletgym
+# import roboschool
+# import pybulletgym
 import gym
 import spinup.algos.ddpg_n_step.modified_envs
 import time
@@ -85,9 +85,9 @@ class ReplayBuffer:
 Deep Deterministic Policy Gradient (DDPG)
 
 """
-def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 0,
+def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 0,
                  steps_per_epoch=5000, epochs=100, replay_size=int(1e6),
-                 n_step=1, gamma=0.99, without_delay_train=False,
+                 n_step=1, gamma=0.99, without_delay_train=False, obs_noise_scale=0,
                  polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000,
                  act_noise=0.1, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
@@ -164,7 +164,7 @@ def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 
     tf.set_random_seed(seed)
     np.random.seed(seed)
 
-    env, test_env = env_fn(), env_fn()
+    env, test_env = gym.make(env_name), gym.make(env_name)
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.shape[0]
 
@@ -285,9 +285,8 @@ def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 
 
         # Step the env
         o2, r, d, _ = env.step(a)
-        state_noise_scale = 0.01
-        o2 += state_noise_scale * np.random.randn(obs_dim)
-        # import pdb; pdb.set_trace()
+        # Add observation noise
+        o2 += obs_noise_scale * np.random.randn(obs_dim)
         ep_ret += r
         ep_len += 1
 
@@ -383,6 +382,8 @@ if __name__ == '__main__':
     parser.add_argument('--new_mlp', action='store_true')
     parser.add_argument('--n_step', type=int, default=5)
     parser.add_argument('--without_delay_train', action='store_true')
+    parser.add_argument('--obs_noise_scale', type=float, default=0)
+    parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--dropout_rate', type=float, default=0)
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
     parser.add_argument('--replay_size', type=int, default=int(1e6))
@@ -407,10 +408,11 @@ if __name__ == '__main__':
     if args.hardcopy_target_nn:
         polyak = 0
 
-    ddpg_dropout(lambda : gym.make(args.env), new_mlp=args.new_mlp, dropout_rate=args.dropout_rate,
+    ddpg_dropout(env_name=args.env, new_mlp=args.new_mlp, dropout_rate=args.dropout_rate,
                  ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
                  n_step=args.n_step, replay_size=args.replay_size,
                  batch_size=args.batch_size,
-                 without_delay_train=args.without_delay_train,
+                 without_delay_train=args.without_delay_train, start_steps=args.start_steps,
+                 obs_noise_scale=args.obs_noise_scale,
                  gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                  logger_kwargs=logger_kwargs)

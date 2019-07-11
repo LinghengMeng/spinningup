@@ -46,7 +46,8 @@ Deep Deterministic Policy Gradient (DDPG)
 
 """
 def ddpg(env_fn, render_env=False, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
-         steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, 
+         steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99,
+         without_delay_train=False,
          polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000, 
          act_noise=0.1, policy_delay=2, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
@@ -232,26 +233,46 @@ def ddpg(env_fn, render_env=False, actor_critic=core.mlp_actor_critic, ac_kwargs
         # most recent observation!
         o = o2
 
+        if t > batch_size and without_delay_train:
+            batch = replay_buffer.sample_batch(batch_size)
+            feed_dict = {x_ph: batch['obs1'],
+                         x2_ph: batch['obs2'],
+                         a_ph: batch['acts'],
+                         r_ph: batch['rews'],
+                         d_ph: batch['done']
+                         }
+
+            # Q-learning update
+            outs = sess.run([q_loss, q, train_q_op], feed_dict)
+            logger.store(LossQ=outs[0], QVals=outs[1])
+
+            # # Policy update
+            # if t % policy_delay == 0:
+            # Delayed policy update
+            outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+            logger.store(LossPi=outs[0])
+
         if d or (ep_len == max_ep_len):
             """
             Perform all DDPG updates at the end of the trajectory,
             in accordance with tuning done by TD3 paper authors.
             """
-            for j in range(ep_len):
-                batch = replay_buffer.sample_batch(batch_size)
-                feed_dict = {x_ph: batch['obs1'],
-                             x2_ph: batch['obs2'],
-                             a_ph: batch['acts'],
-                             r_ph: batch['rews'],
-                             d_ph: batch['done']
-                            }
+            if not without_delay_train:
+                for j in range(ep_len):
+                    batch = replay_buffer.sample_batch(batch_size)
+                    feed_dict = {x_ph: batch['obs1'],
+                                 x2_ph: batch['obs2'],
+                                 a_ph: batch['acts'],
+                                 r_ph: batch['rews'],
+                                 d_ph: batch['done']
+                                }
 
-                # Q-learning update
-                outs = sess.run([q_loss, q, train_q_op], feed_dict)
-                logger.store(LossQ=outs[0], QVals=outs[1])
+                    # Q-learning update
+                    outs = sess.run([q_loss, q, train_q_op], feed_dict)
+                    logger.store(LossQ=outs[0], QVals=outs[1])
 
-                # Policy update
-                if j % policy_delay == 0:
+                    # # Policy update
+                    # if j % policy_delay == 0:
                     # Delayed policy update
                     outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
                     logger.store(LossPi=outs[0])
@@ -264,9 +285,9 @@ def ddpg(env_fn, render_env=False, actor_critic=core.mlp_actor_critic, ac_kwargs
         if t > 0 and t % steps_per_epoch == 0:
             epoch = t // steps_per_epoch
 
-            # Save model
-            if (epoch % save_freq == 0) or (epoch == epochs-1):
-                logger.save_state({'env': env}, None)
+            # # Save model
+            # if (epoch % save_freq == 0) or (epoch == epochs-1):
+            #     logger.save_state({'env': env}, None)
 
             # Test the performance of the deterministic version of the agent.
             test_agent()
@@ -296,6 +317,8 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--steps_per_epoch', type=int, default=5000)
     parser.add_argument('--start_steps', type=int, default=10000)
+    parser.add_argument('--without_delay_train', action='store_true')
+    parser.add_argument('--replay_size', type=int, default=int(1e6))
     parser.add_argument('--exp_name', type=str, default='ddpg')
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
     parser.add_argument('--act_noise',type=float, default=0.1)
@@ -323,6 +346,7 @@ if __name__ == '__main__':
          actor_critic=core.mlp_actor_critic,
          ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
          gamma=args.gamma, seed=args.seed,
+         without_delay_train=args.without_delay_train,replay_size=args.replay_size,
          epochs=args.epochs,
          steps_per_epoch=args.steps_per_epoch, start_steps=args.start_steps,
          logger_kwargs=logger_kwargs)

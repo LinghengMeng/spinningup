@@ -333,7 +333,7 @@ class BootstrappedEnsemble():
         for i_batch in range(ensemble_postSample.shape[0]):
             uncertainty_rank[i_batch] = np.sum(np.diag(np.cov(ensemble_postSample[i_batch], rowvar=False)))
         # Find top_n highest uncertainty samples
-        top_n_highest_uncertainty_indices = np.argsort(uncertainty_rank)[-batch_size:]
+        top_n_highest_uncertainty_indices = np.argsort(-uncertainty_rank)[:batch_size]
         batch = {}
         batch['x'] = raw_batch['x'][top_n_highest_uncertainty_indices]
         batch['y'] = raw_batch['y'][top_n_highest_uncertainty_indices]

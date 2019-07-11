@@ -21,7 +21,7 @@ def dbedpg_distributed(env_name, render_env=False, ac_kwargs=dict(), seed=0,
            steps_per_epoch=5000, epochs=100,
            ensemble_size = 20,
            batch_size=100, raw_batch_size=500, uncertainty_based_minibatch=False,
-           replay_size=int(1e6), replay_buf_bootstrap_p=0.75,
+           replay_size=int(1e6), replay_buf_bootstrap_p=0.75, policy_type='act_with_highest_predicted_q',
            gamma=0.99,
            polyak=0.995, pi_lr=1e-3, q_lr=1e-3, start_steps=10000,
            act_noise=0.1, policy_delay=2, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
@@ -118,25 +118,22 @@ def dbedpg_distributed(env_name, render_env=False, ac_kwargs=dict(), seed=0,
     def get_action(o, noise_scale, ac_i=0):
         ac_ensemble_preds_a = ac_ensemble.predict_a(o)
         ac_ensemble_preds_a = ac_ensemble_preds_a.reshape(ensemble_size, -1)
-        # Select action with the highest predicted Q-value
         ac_ensemble_preds_q = ac_ensemble.predict_q(o)
-        # Descending sort
-        descending_sort_q = np.argsort(-ac_ensemble_preds_q)
-        a = ac_ensemble_preds_a[descending_sort_q[0], :]
-        a += noise_scale * np.random.randn(act_dim)
-
-        # #1. random actor-critic
-        # a = ac_ensemble_preds_a[ac_i, :]
-        # a += noise_scale * np.random.randn(act_dim)
-        # 2. one actor-critic for each epoch
-        # a = ac_ensemble_preds[ac_i, :]
-        # a += noise_scale * np.random.randn(act_dim)
-        # # 3.
-        # concentration_factor = 0.5
-        # a_cov = np.cov(ac_ensemble_preds, rowvar=False)
-        # a_cov_shaped = concentration_factor * a_cov
-        # a = np.random.multivariate_normal(np.mean(ac_ensemble_preds, axis=0), a_cov_shaped, 1)[0]
-        return np.clip(a, -act_limit, act_limit)
+        if policy_type == 'act_with_highest_predicted_q':
+            # Select action with the highest predicted Q-value
+            descending_sort_q = np.argsort(-ac_ensemble_preds_q) # Descending sort
+            a = ac_ensemble_preds_a[descending_sort_q[0], :]
+            a += noise_scale * np.random.randn(act_dim)
+        elif policy_type == 'random_ac_for_each_epoch':
+            # random actor-critic for each epoch
+            a = ac_ensemble_preds_a[ac_i, :]
+            a += noise_scale * np.random.randn(act_dim)
+        elif policy_type == 'sample_based_on_action_covariance':
+            concentration_factor = 0.5
+            a_cov = np.cov(ac_ensemble_preds_a, rowvar=False)
+            a_cov_shaped = concentration_factor * a_cov
+            a = np.random.multivariate_normal(np.mean(ac_ensemble_preds_a, axis=0), a_cov_shaped, 1)[0]
+        return np.clip(a, -act_limit, act_limit), np.var(ac_ensemble_preds_q)
 
     def get_action_test(o, ac_i):
         a = ac_ensemble.predict_a(o, ac_i)
@@ -155,7 +152,7 @@ def dbedpg_distributed(env_name, render_env=False, ac_kwargs=dict(), seed=0,
         return ['TestEpRetAC{}'.format(ac_i), 'TestEpLenAC{}'.format(ac_i)]
 
     start_time = time.time()
-    o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
+    o, r, d, ep_ret, ep_len, ep_var_q = env.reset(), 0, False, 0, 0, 0
     total_steps = steps_per_epoch * epochs
 
     # Main loop: collect experience in env and update/log each epoch
@@ -167,9 +164,10 @@ def dbedpg_distributed(env_name, render_env=False, ac_kwargs=dict(), seed=0,
         use the learned policy (with some noise, via act_noise). 
         """
         if t > start_steps:
-            a = get_action(o, act_noise, ac_i=int((t // steps_per_epoch)%ensemble_size))
+            a, var_q = get_action(o, act_noise, ac_i=int((t // steps_per_epoch)%ensemble_size))
         else:
             a = env.action_space.sample()
+            var_q = 0
 
         # # TODO: delete
         # pred = ac_ensemble.predict_a(o)
@@ -183,6 +181,7 @@ def dbedpg_distributed(env_name, render_env=False, ac_kwargs=dict(), seed=0,
         o2, r, d, _ = env.step(a)
         ep_ret += r
         ep_len += 1
+        ep_var_q += var_q
 
         # Ignore the "done" signal if it comes from hitting the time
         # horizon (that is, when it's an artificial terminal signal
@@ -190,7 +189,8 @@ def dbedpg_distributed(env_name, render_env=False, ac_kwargs=dict(), seed=0,
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        ac_ensemble.add_to_replay_buffer(o, a, r, o2, d, t, t // steps_per_epoch, time.time()-start_time)
+        ac_ensemble.add_to_replay_buffer(o, a, r, o2, d, t, t // steps_per_epoch, time.time()-start_time,
+                                         var_q=var_q)
 
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
@@ -216,7 +216,7 @@ def dbedpg_distributed(env_name, render_env=False, ac_kwargs=dict(), seed=0,
                 logger.store(**kwargs)
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
-            o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
+            o, r, d, ep_ret, ep_len, ep_var_q = env.reset(), 0, False, 0, 0, 0
 
         # End of epoch wrap-up
         if t > 0 and t % steps_per_epoch == 0:
@@ -238,6 +238,7 @@ def dbedpg_distributed(env_name, render_env=False, ac_kwargs=dict(), seed=0,
             logger.log_tabular('Epoch', epoch)
             logger.log_tabular('EpRet', with_min_and_max=True)
             logger.log_tabular('EpLen', average_only=True)
+            logger.log_tabular('EpVarQ', with_min_and_max=True)
             for log_args_kyes in test_log_args_keys:
                 logger.log_tabular(log_args_kyes[0], with_min_and_max=True)
                 logger.log_tabular(log_args_kyes[1], average_only=True)
@@ -264,6 +265,9 @@ if __name__ == '__main__':
     parser.add_argument('--ensemble_size', type=int, default=20)
     parser.add_argument('--replay_buf_bootstrap_p', type=float, default=1)
     parser.add_argument('--uncertainty_based_minibatch', action='store_true')
+    parser.add_argument('--policy_type', type=str,
+                        choices=['act_with_highest_predicted_q', 'random_ac_for_each_epoch', 'sample_based_on_action_covariance'],
+                        default='random_ac_for_each_epoch')
     parser.add_argument('--act_noise',type=float, default=0.1)
     parser.add_argument("--exploration-strategy", type=str, choices=["action_noise", "epsilon_greedy"],
                         default='epsilon_greedy', help='action_noise or epsilon_greedy')
@@ -288,6 +292,7 @@ if __name__ == '__main__':
                        ensemble_size=args.ensemble_size,
                        replay_buf_bootstrap_p=args.replay_buf_bootstrap_p,
                        uncertainty_based_minibatch=args.uncertainty_based_minibatch,
+                       policy_type=args.policy_type,
                        epochs=args.epochs,
                        steps_per_epoch=args.steps_per_epoch, start_steps=args.start_steps,
                        logger_kwargs=logger_kwargs)

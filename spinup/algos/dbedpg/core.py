@@ -2,7 +2,8 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from spinup.utils.logx import Logger
-import ray
+import time
+# import ray
 # if not ray.is_initialized():
 #     ray.init(num_gpus=1)
 
@@ -251,7 +252,11 @@ class BootstrappedActorCriticEnsemble():
         return ac_en_q_loss, ac_en_q, ac_en_pi_loss
 
     def _generate_mini_batch(self, batch_size=100, raw_batch_size=500, uncertainty_based_minibatch=False):
+        # TODO：use multiprocessing to parallel mini-batch sampling
+        import pdb; pdb.set_trace()
+        start_time = time.time()
         random_mini_batches = [reply_buf.sample_batch(batch_size) for reply_buf in self.ensemble_replay_bufs]
+        print('ramdom mini-batch sampling costs: {}s'.format(time.time()-start_time))
         return random_mini_batches
 
     def add_to_replay_buffer(self, obs, act, rew, next_obs, done,

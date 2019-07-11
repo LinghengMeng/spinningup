@@ -1,7 +1,7 @@
 import os.path as osp
 import numpy as np
 import tensorflow as tf
-import roboschool
+# import roboschool
 import pybulletgym
 import gym
 import time
@@ -270,6 +270,9 @@ def ddpg_dropout(env_fn, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 
 
         # Step the env
         o2, r, d, _ = env.step(a)
+        state_noise_scale = 0.01
+        o2 += state_noise_scale * np.random.randn(obs_dim)
+        # import pdb; pdb.set_trace()
         ep_ret += r
         ep_len += 1
 
