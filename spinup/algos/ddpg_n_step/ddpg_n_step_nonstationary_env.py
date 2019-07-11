@@ -281,10 +281,10 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
         else:
             a = env.action_space.sample()
 
-        # env.render()
+        env.render()
         gravity_cycle = 1000
         gravity_base = -9.81
-        env.model.opt.gravity[2] = gravity_base * 1/2 * [np.cos(2*np.pi/gravity_cycle*t) + 1]
+        env.model.opt.gravity[2] = gravity_base * 1/2 * (np.cos(2*np.pi/gravity_cycle*t) + 1)
 
         # Step the env
         o2, r, d, _ = env.step(a)
