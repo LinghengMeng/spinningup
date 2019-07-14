@@ -393,7 +393,7 @@ if __name__ == '__main__':
     parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--obs_noise_scale', type=float, default=0)
     parser.add_argument('--start_steps', type=int, default=10000)
-    parser.add_argument('--nonstationary_env', type=bool, default=False)
+    parser.add_argument('--nonstationary_env', action='store_true')
     parser.add_argument('--gravity_cycle', type=int, default=1000)
     parser.add_argument('--gravity_base', type=float, default=-9.81)
     parser.add_argument('--dropout_rate', type=float, default=0)
