@@ -269,7 +269,7 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
 
     start_time = time.time()
     # TODO: delete env.render()
-    env.render()
+    # env.render()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
     total_steps = steps_per_epoch * epochs
 
