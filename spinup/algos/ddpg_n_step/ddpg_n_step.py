@@ -88,7 +88,9 @@ Deep Deterministic Policy Gradient (DDPG)
 def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 0,
                  steps_per_epoch=5000, epochs=100, replay_size=int(1e6),
                  n_step=1, gamma=0.99, without_delay_train=False, obs_noise_scale=0,
-                 nonstationary_env=False, gravity_cycle = 1000, gravity_base = -9.81,
+                 nonstationary_env=False,
+                 gravity_change_pattern = 'gravity_averagely_equal',
+                 gravity_cycle = 1000, gravity_base = -9.81,
                  polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000,
                  act_noise=0.1, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
@@ -266,6 +268,8 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
     start_time = time.time()
+    # TODO: delete env.render()
+    env.render()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
     total_steps = steps_per_epoch * epochs
 
@@ -285,7 +289,15 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
         # env.render()
         # Manipulate environment
         if nonstationary_env == True:
-            gravity = gravity_base * 1/2 * (np.cos(2*np.pi/gravity_cycle*t) + 1)
+            if gravity_change_pattern == 'gravity_averagely_equal':
+                gravity = gravity_base * 1 / 2 * (np.cos(2 * np.pi / gravity_cycle * t) + 1) + gravity_base / 2
+            elif gravity_change_pattern == 'gravity_averagely_easier':
+                gravity = gravity_base * 1 / 2 * (np.cos(2 * np.pi / gravity_cycle * t) + 1)
+            elif gravity_change_pattern == 'gravity_averagely_harder':
+                gravity = gravity_base * 1 / 2 * (-np.cos(2 * np.pi / gravity_cycle * t) + 1) + gravity_base
+            else:
+                pass
+
             if 'PyBulletEnv' in env_name:
                 env.env._p.setGravity(0, 0, gravity)
             elif 'Roboschool' in env_name:
@@ -394,6 +406,7 @@ if __name__ == '__main__':
     parser.add_argument('--obs_noise_scale', type=float, default=0)
     parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--nonstationary_env', action='store_true')
+    parser.add_argument('--gravity_change_pattern', type=str, default='gravity_averagely_equal')
     parser.add_argument('--gravity_cycle', type=int, default=1000)
     parser.add_argument('--gravity_base', type=float, default=-9.81)
     parser.add_argument('--dropout_rate', type=float, default=0)
@@ -427,6 +440,7 @@ if __name__ == '__main__':
                  without_delay_train=args.without_delay_train, start_steps=args.start_steps,
                  obs_noise_scale=args.obs_noise_scale,
                  nonstationary_env=args.nonstationary_env,
+                 gravity_change_pattern=args.gravity_change_pattern,
                  gravity_cycle = args.gravity_cycle, gravity_base = args.gravity_base,
                  gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                  logger_kwargs=logger_kwargs)
