@@ -286,15 +286,20 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
         else:
             a = env.action_space.sample()
 
-        # env.render()
+        #env.render()
         # Manipulate environment
+        change_scale = 1/8
         if nonstationary_env == True:
             if gravity_change_pattern == 'gravity_averagely_equal':
-                gravity = gravity_base * 1 / 2 * (np.cos(2 * np.pi / gravity_cycle * t) + 1) + gravity_base / 2
+                # gravity = gravity_base * 1 / 2 * (np.cos(2 * np.pi / gravity_cycle * t) + 1) + gravity_base / 2
+                gravity = gravity_base + np.abs(gravity_base) * change_scale * np.sin(2 * np.pi / gravity_cycle * t)
             elif gravity_change_pattern == 'gravity_averagely_easier':
-                gravity = gravity_base * 1 / 2 * (np.cos(2 * np.pi / gravity_cycle * t) + 1)
+                # gravity = gravity_base * 1 / 2 * (np.cos(2 * np.pi / gravity_cycle * t) + 1)
+                gravity = gravity_base * change_scale * (np.cos(2 * np.pi / gravity_cycle * t)) + gravity_base * ( 1 - change_scale)
             elif gravity_change_pattern == 'gravity_averagely_harder':
-                gravity = gravity_base * 1 / 2 * (-np.cos(2 * np.pi / gravity_cycle * t) + 1) + gravity_base
+                # gravity = gravity_base * 1 / 2 * (-np.cos(2 * np.pi / gravity_cycle * t) + 1) + gravity_base
+                gravity = gravity_base * change_scale * (-np.cos(2 * np.pi / gravity_cycle * t)) + gravity_base * (
+                            1 + change_scale)
             else:
                 pass
 
