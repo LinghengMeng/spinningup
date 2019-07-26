@@ -92,7 +92,8 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
                  gravity_change_pattern = 'gravity_averagely_equal',
                  gravity_cycle = 1000, gravity_base = -9.81,
                  polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000,
-                 act_noise=0.1, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
+                 act_noise=0.1, random_action_baseline=False,
+                 max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
 
     Args:
@@ -281,7 +282,7 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
         from a uniform distribution for better exploration. Afterwards, 
         use the learned policy (with some noise, via act_noise). 
         """
-        if t > start_steps:
+        if t > start_steps and not random_action_baseline:
             a = get_action(o, act_noise)
         else:
             a = env.action_space.sample()
@@ -408,6 +409,7 @@ if __name__ == '__main__':
     parser.add_argument('--new_mlp', action='store_true')
     parser.add_argument('--n_step', type=int, default=5)
     parser.add_argument('--without_delay_train', action='store_true')
+    parser.add_argument('--random_action_baseline', action='store_true')
     parser.add_argument('--obs_noise_scale', type=float, default=0)
     parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--nonstationary_env', action='store_true')
@@ -443,6 +445,7 @@ if __name__ == '__main__':
                  n_step=args.n_step, replay_size=args.replay_size,
                  batch_size=args.batch_size,
                  without_delay_train=args.without_delay_train, start_steps=args.start_steps,
+                 random_action_baseline=args.random_action_baseline,
                  obs_noise_scale=args.obs_noise_scale,
                  nonstationary_env=args.nonstationary_env,
                  gravity_change_pattern=args.gravity_change_pattern,
