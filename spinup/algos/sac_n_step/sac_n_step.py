@@ -1,5 +1,7 @@
 import numpy as np
 import tensorflow as tf
+import pybulletgym
+import roboschool
 import gym
 import time
 from spinup.algos.sac_n_step import core
