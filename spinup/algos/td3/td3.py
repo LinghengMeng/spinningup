@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
 import gym
+import roboschool
+import pybulletgym
 import time
 from spinup.algos.td3 import core
 from spinup.algos.td3.core import get_vars
@@ -128,9 +130,6 @@ def td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             the current policy and value function.
 
     """
-    # TODO: Test no start steps
-    if without_start_steps:
-        start_steps = batch_size
 
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
@@ -335,21 +334,25 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
     parser.add_argument('--epochs', type=int, default=200)
-    parser.add_argument('--without_start_steps', action='store_true')
+    parser.add_argument('--start_steps', type=int, default=10000)
+    parser.add_argument('--replay_size', type=int, default=int(1e6))
     parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--exp_name', type=str, default='td3_one_layer')
     parser.add_argument('--act_noise', type=float, default=0.1)
+    parser.add_argument("--data_dir", type=str, default='spinup_data')
     args = parser.parse_args()
 
     # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
+
     data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
-                        'spinup_data')
+                        args.data_dir)
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
     
     td3(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
-        without_start_steps=args.without_start_steps,
+        start_steps=args.start_steps,
+        replay_size=args.replay_size,
         without_delay_train=args.without_delay_train,
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
         act_noise=args.act_noise,
