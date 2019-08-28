@@ -48,7 +48,7 @@ def td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, 
         polyak=0.995, pi_lr=1e-3, q_lr=1e-3,
         without_start_steps=True, batch_size=100, start_steps=10000,
-        without_delay_train=False,
+        without_delay_train=False, without_target_policy_smoothing=False,
         act_noise=0.1, target_noise=0.2, noise_clip=0.5, policy_delay=2, 
         max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
@@ -160,12 +160,14 @@ def td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     
     # Target Q networks
     with tf.variable_scope('target', reuse=True):
-
-        # Target policy smoothing, by adding clipped noise to target actions
-        epsilon = tf.random_normal(tf.shape(pi_targ), stddev=target_noise)
-        epsilon = tf.clip_by_value(epsilon, -noise_clip, noise_clip)
-        a2 = pi_targ + epsilon
-        a2 = tf.clip_by_value(a2, -act_limit, act_limit)
+        if without_target_policy_smoothing:
+            a2 = pi_targ
+        else:
+            # Target policy smoothing, by adding clipped noise to target actions
+            epsilon = tf.random_normal(tf.shape(pi_targ), stddev=target_noise)
+            epsilon = tf.clip_by_value(epsilon, -noise_clip, noise_clip)
+            a2 = pi_targ + epsilon
+            a2 = tf.clip_by_value(a2, -act_limit, act_limit)
 
         # Target Q-values, using action from target policy
         _, q1_targ, q2_targ, _ = actor_critic(x2_ph, a2, **ac_kwargs)
@@ -337,6 +339,7 @@ if __name__ == '__main__':
     parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--replay_size', type=int, default=int(1e6))
     parser.add_argument('--without_delay_train', action='store_true')
+    parser.add_argument('--without_target_policy_smoothing', action='store_true')
     parser.add_argument('--exp_name', type=str, default='td3_one_layer')
     parser.add_argument('--act_noise', type=float, default=0.1)
     parser.add_argument("--data_dir", type=str, default='spinup_data')
@@ -354,6 +357,7 @@ if __name__ == '__main__':
         start_steps=args.start_steps,
         replay_size=args.replay_size,
         without_delay_train=args.without_delay_train,
+        without_target_policy_smoothing=args.without_target_policy_smoothing,
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
         act_noise=args.act_noise,
         logger_kwargs=logger_kwargs)
