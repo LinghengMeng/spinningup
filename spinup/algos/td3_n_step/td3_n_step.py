@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
 import gym
+import roboschool
+import pybulletgym
 import time
 from spinup.algos.td3_n_step import core
 from spinup.algos.td3_n_step.core import get_vars
@@ -84,7 +86,7 @@ def td3_n_step(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), see
                polyak=0.995, pi_lr=1e-3, q_lr=1e-3,
                without_start_steps=True,
                n_step=5, batch_size=100, start_steps=10000,
-               without_delay_train=False,
+               without_delay_train=False, without_target_policy_smoothing=False,
                act_noise=0.1, target_noise=0.2, noise_clip=0.5, policy_delay=2,
                max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
@@ -188,8 +190,9 @@ def td3_n_step(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), see
 
     # Inputs to computation graph
     x_ph, a_ph, x2_ph = core.placeholders(obs_dim, act_dim, obs_dim)
-    r_ph = tf.placeholder(dtype=tf.float32, shape=(None, n_step))
-    d_ph = tf.placeholder(dtype=tf.float32, shape=(None, n_step))
+    r_ph = tf.placeholder(dtype=tf.float32, shape=(None, None))
+    d_ph = tf.placeholder(dtype=tf.float32, shape=(None, None))
+    n_step_ph = tf.placeholder(dtype=tf.float32, shape=())
 
     # Main outputs from computation graph
     with tf.variable_scope('main'):
@@ -201,12 +204,14 @@ def td3_n_step(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), see
     
     # Target Q networks
     with tf.variable_scope('target', reuse=True):
-
-        # Target policy smoothing, by adding clipped noise to target actions
-        epsilon = tf.random_normal(tf.shape(pi_targ), stddev=target_noise)
-        epsilon = tf.clip_by_value(epsilon, -noise_clip, noise_clip)
-        a2 = pi_targ + epsilon
-        a2 = tf.clip_by_value(a2, -act_limit, act_limit)
+        if without_target_policy_smoothing:
+            a2 = pi_targ
+        else:
+            # Target policy smoothing, by adding clipped noise to target actions
+            epsilon = tf.random_normal(tf.shape(pi_targ), stddev=target_noise)
+            epsilon = tf.clip_by_value(epsilon, -noise_clip, noise_clip)
+            a2 = pi_targ + epsilon
+            a2 = tf.clip_by_value(a2, -act_limit, act_limit)
 
         # Target Q-values, using action from target policy
         _, q1_targ, q2_targ, _ = actor_critic(x2_ph, a2, **ac_kwargs)
@@ -220,9 +225,9 @@ def td3_n_step(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), see
 
     # Bellman backup for Q functions, using Clipped Double-Q targets
     min_q_targ = tf.minimum(q1_targ, q2_targ)
-    # backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*min_q_targ)
-    backup = tf.stop_gradient(tf.reduce_sum(tf.multiply([gamma ** (i) for i in range(n_step)] * (1 - d_ph), r_ph), axis=1)
-                              + gamma ** n_step * (1 - d_ph[:, -1]) * min_q_targ)
+    backup = tf.stop_gradient(
+        tf.reduce_sum(tf.multiply(tf.pow(gamma, tf.range(1, n_step_ph + 1)) * (1 - d_ph), r_ph), axis=1)
+        + gamma ** n_step_ph * (1 - d_ph[:, -1]) * min_q_targ)
 
     # TD3 losses
     pi_loss = -tf.reduce_mean(q1_pi)
@@ -300,14 +305,15 @@ def td3_n_step(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), see
         # most recent observation!
         o = o2
 
-        if without_delay_train:
+        if t > batch_size and without_delay_train:
             # batch = replay_buffer.sample_batch(batch_size)
             batch = replay_buffer.sample_batch_n_step(batch_size, n_step=n_step)
             feed_dict = {x_ph: batch['obs1'],
                          x2_ph: batch['obs2'],
                          a_ph: batch['acts'],
                          r_ph: batch['rews'],
-                         d_ph: batch['done']
+                         d_ph: batch['done'],
+                         n_step_ph: n_step
                          }
             q_step_ops = [q_loss, q1, q2, train_q_op]
             outs = sess.run(q_step_ops, feed_dict)
@@ -331,16 +337,15 @@ def td3_n_step(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), see
                                  x2_ph: batch['obs2'],
                                  a_ph: batch['acts'],
                                  r_ph: batch['rews'],
-                                 d_ph: batch['done']
+                                 d_ph: batch['done'],
+                                 n_step_ph: n_step
                                 }
                     q_step_ops = [q_loss, q1, q2, train_q_op]
                     outs = sess.run(q_step_ops, feed_dict)
                     logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2])
 
-                    if j % policy_delay == 0:
-                        # Delayed policy update
-                        outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
-                        logger.store(LossPi=outs[0])
+                    outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+                    logger.store(LossPi=outs[0])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -381,26 +386,30 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--n_step', type=int, default=5)
     parser.add_argument('--replay_size', type=int, default=int(1e6))
+    parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--without_start_steps', action='store_true')
     parser.add_argument('--without_delay_train', action='store_true')
-    parser.add_argument('--exp_name', type=str, default='td3_one_layer')
+    parser.add_argument('--without_target_policy_smoothing', action='store_true')
+    parser.add_argument('--exp_name', type=str, default='td3_n_step')
     parser.add_argument('--act_noise', type=float, default=0.1)
+    parser.add_argument("--data_dir", type=str, default='spinup_data')
     args = parser.parse_args()
 
     # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
+
     data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
-                        'spinup_data')
+                        args.data_dir)
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
     
     td3_n_step(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
                ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
                n_step=args.n_step, replay_size=args.replay_size,
+               start_steps=args.start_steps,
                without_start_steps=args.without_start_steps,
                without_delay_train=args.without_delay_train,
+               without_target_policy_smoothing=args.without_target_policy_smoothing,
                gamma=args.gamma, seed=args.seed, epochs=args.epochs,
                act_noise=args.act_noise,
                logger_kwargs=logger_kwargs)
 
-# python ./spinup/algos/td3/td3.py --env HalfCheetah-v2 --seed 3 --l 2 --exp_name td3_two_layers
-# python ./spinup/algos/td3/td3.py --env Ant-v2 --seed 3 --l 2 --exp_name td3_Ant_v2_two_layers
