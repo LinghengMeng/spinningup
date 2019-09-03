@@ -1,7 +1,7 @@
 import os.path as osp
 import numpy as np
 import tensorflow as tf
-# import roboschool
+import roboschool
 import pybulletgym
 import gym
 import spinup.algos.ddpg_n_step.modified_envs
@@ -74,6 +74,7 @@ class ReplayBuffer:
         for d_i in range(done_index.shape[1]):
             x, y=done_index[:, d_i]
             batch_done[x, y:] = 1
+        batch_done = np.hstack((np.zeros((batch_size, 1)), batch_done))
         return dict(obs1=batch_obs1[:,0,:],
                     obs2=batch_obs2[:,-1,:],
                     acts=batch_acts[:,0,:],
@@ -87,7 +88,9 @@ Deep Deterministic Policy Gradient (DDPG)
 """
 def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 0,
                  steps_per_epoch=5000, epochs=100, replay_size=int(1e6),
-                 n_step=1, gamma=0.99, without_delay_train=False, obs_noise_scale=0,
+                 n_step=1,
+                 random_n_step=False, random_n_step_low=1, random_n_step_high=5,
+                 gamma=0.99, without_delay_train=False, obs_noise_scale=0,
                  nonstationary_env=False,
                  gravity_change_pattern = 'gravity_averagely_equal',
                  gravity_cycle = 1000, gravity_base = -9.81,
@@ -180,8 +183,11 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
 
     # Inputs to computation graph
     x_ph, a_ph, x2_ph = core.placeholders(obs_dim, act_dim, obs_dim)
-    r_ph = tf.placeholder(dtype=tf.float32, shape=(None, n_step))
-    d_ph = tf.placeholder(dtype=tf.float32, shape=(None, n_step))
+    # r_ph = tf.placeholder(dtype=tf.float32, shape=(None, n_step))
+    # d_ph = tf.placeholder(dtype=tf.float32, shape=(None, n_step))
+    r_ph = tf.placeholder(dtype=tf.float32, shape=(None, None))
+    d_ph = tf.placeholder(dtype=tf.float32, shape=(None, None))
+    n_step_ph = tf.placeholder(dtype=tf.float32, shape=())
 
     hidden_sizes = list(ac_kwargs['hidden_sizes'])
     actor_hidden_activation = tf.keras.activations.relu
@@ -222,8 +228,18 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
     print('\nNumber of parameters: \t pi: %d, \t q: %d, \t total: %d\n'%var_counts)
 
     # Bellman backup for Q function
-    backup = tf.stop_gradient(tf.reduce_sum(tf.multiply([gamma**(i) for i in range(n_step)] * (1-d_ph), r_ph), axis=1)
-                              + gamma**n_step*(1-d_ph[:, -1])*q_pi_targ)
+    backup = tf.stop_gradient(
+        tf.reduce_sum(tf.multiply(tf.pow(gamma, tf.range(0, n_step_ph))
+                                  * (1 - tf.slice(d_ph, [0, 0], [batch_size, n_step])), r_ph), axis=1)
+        + gamma ** n_step_ph * (1 - tf.reshape(tf.slice(d_ph, [0, n_step], [batch_size, 1]), [-1])) * q_pi_targ)
+    # backup = tf.stop_gradient(
+    #     tf.reduce_sum(tf.multiply(tf.pow(gamma, tf.range(0, n_step_ph)) * (1 - d_ph), r_ph), axis=1)
+    #     + gamma ** n_step_ph * (1 - d_ph[:, -1]) * q_pi_targ)
+    # backup = tf.stop_gradient(
+    #     tf.reduce_sum(tf.multiply(tf.pow(gamma, tf.range(1, n_step_ph+1)) * (1 - d_ph), r_ph), axis=1)
+    #     + gamma ** n_step_ph * (1 - d_ph[:, -1]) * q_pi_targ)
+    # backup = tf.stop_gradient(tf.reduce_sum(tf.multiply([gamma**(i) for i in range(n_step)] * (1-d_ph), r_ph), axis=1)
+    #                           + gamma**n_step*(1-d_ph[:, -1])*q_pi_targ)
 
     # DDPG losses
     # 1.
@@ -269,7 +285,7 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
     start_time = time.time()
-    # TODO: delete env.render()
+    # # TODO: delete env.render()
     # env.render()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
     total_steps = steps_per_epoch * epochs
@@ -330,14 +346,18 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
         o = o2
 
         if t > batch_size and without_delay_train:
+            if random_n_step:
+                n_step = np.random.randint(random_n_step_low, random_n_step_high + 1, 1)[0]
+
             batch = replay_buffer.sample_batch_n_step(batch_size, n_step=n_step)
             feed_dict = {x_ph: batch['obs1'],
                          x2_ph: batch['obs2'],
                          a_ph: batch['acts'],
                          r_ph: batch['rews'],
-                         d_ph: batch['done']
+                         d_ph: batch['done'],
+                         n_step_ph: n_step
                          }
-
+            # import pdb; pdb.set_trace()
             # Q-learning update
             outs = sess.run([q_loss, q, train_q_op], feed_dict)
             logger.store(LossQ=outs[0], QVals=outs[1])
@@ -353,12 +373,15 @@ def ddpg_dropout(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate 
             """
             if not without_delay_train:
                 for _ in range(ep_len):
+                    if random_n_step:
+                        n_step = np.random.randint(random_n_step_low, random_n_step_high+1, 1)[0]
                     batch = replay_buffer.sample_batch_n_step(batch_size, n_step=n_step)
                     feed_dict = {x_ph: batch['obs1'],
                                  x2_ph: batch['obs2'],
                                  a_ph: batch['acts'],
                                  r_ph: batch['rews'],
-                                 d_ph: batch['done']
+                                 d_ph: batch['done'],
+                                 n_step_ph: n_step
                                 }
 
                     # Q-learning update
@@ -408,6 +431,9 @@ if __name__ == '__main__':
     parser.add_argument('--exp_name', type=str, default='ddpg_dropout')
     parser.add_argument('--new_mlp', action='store_true')
     parser.add_argument('--n_step', type=int, default=5)
+    parser.add_argument('--random_n_step', action='store_true')
+    parser.add_argument('--random_n_step_low', type=int, default=1)
+    parser.add_argument('--random_n_step_high', type=int, default=5)
     parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--random_action_baseline', action='store_true')
     parser.add_argument('--obs_noise_scale', type=float, default=0)
@@ -426,7 +452,7 @@ if __name__ == '__main__':
     parser.add_argument("--epsilon-min", type=float, default=.01, help='minimum of epsilon')
     parser.add_argument("--epsilon-decay", type=float, default=.001, help='epsilon decay')
 
-    parser.add_argument("--data_dir", type=str, default=None)
+    parser.add_argument("--data_dir", type=str, default='spinup_data')
 
     args = parser.parse_args()
 
@@ -434,7 +460,8 @@ if __name__ == '__main__':
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, args.data_dir, datestamp=True)
     # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
-    data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))), 'spinup_data')
+    data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
+                        args.data_dir)
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
 
     if args.hardcopy_target_nn:
@@ -442,7 +469,10 @@ if __name__ == '__main__':
 
     ddpg_dropout(env_name=args.env, new_mlp=args.new_mlp, dropout_rate=args.dropout_rate,
                  ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
-                 n_step=args.n_step, replay_size=args.replay_size,
+                 n_step=args.n_step,
+                 random_n_step=args.random_n_step,
+                 random_n_step_low=args.random_n_step_low, random_n_step_high=args.random_n_step_high,
+                 replay_size=args.replay_size,
                  batch_size=args.batch_size,
                  without_delay_train=args.without_delay_train, start_steps=args.start_steps,
                  random_action_baseline=args.random_action_baseline,
