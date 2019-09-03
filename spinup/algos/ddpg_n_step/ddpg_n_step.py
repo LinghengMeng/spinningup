@@ -1,7 +1,7 @@
 import os.path as osp
 import numpy as np
 import tensorflow as tf
-# import roboschool
+import roboschool
 import pybulletgym
 import gym
 import spinup.algos.ddpg_n_step.modified_envs
@@ -434,7 +434,7 @@ if __name__ == '__main__':
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, args.data_dir, datestamp=True)
     # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
-    data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))), 'spinup_data')
+    data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))), args.data_dir)
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
 
     if args.hardcopy_target_nn:
