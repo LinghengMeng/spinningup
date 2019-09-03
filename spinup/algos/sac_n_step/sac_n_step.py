@@ -71,6 +71,7 @@ class ReplayBuffer:
         for d_i in range(done_index.shape[1]):
             x, y = done_index[:, d_i]
             batch_done[x, y:] = 1
+        batch_done = np.hstack((np.zeros((batch_size, 1)), batch_done))
         return dict(obs1=batch_obs1[:, 0, :],
                     obs2=batch_obs2[:, -1, :],
                     acts=batch_acts[:, 0, :],
@@ -192,8 +193,11 @@ def sac_n_step(env_name, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
 
     # Inputs to computation graph
     x_ph, a_ph, x2_ph = core.placeholders(obs_dim, act_dim, obs_dim)
-    r_ph = tf.placeholder(dtype=tf.float32, shape=(None, n_step))
-    d_ph = tf.placeholder(dtype=tf.float32, shape=(None, n_step))
+    # r_ph = tf.placeholder(dtype=tf.float32, shape=(None, n_step))
+    # d_ph = tf.placeholder(dtype=tf.float32, shape=(None, n_step))
+    r_ph = tf.placeholder(dtype=tf.float32, shape=(None, None))
+    d_ph = tf.placeholder(dtype=tf.float32, shape=(None, None))
+    n_step_ph = tf.placeholder(dtype=tf.float32, shape=())
 
     # Main outputs from computation graph
     with tf.variable_scope('main'):
@@ -218,8 +222,12 @@ def sac_n_step(env_name, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
     # Targets for Q and V regression
     # q_backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*v_targ)
     q_backup = tf.stop_gradient(
-        tf.reduce_sum(tf.multiply([gamma ** (i) for i in range(n_step)] * (1 - d_ph), r_ph), axis=1)
-        + gamma ** n_step * (1 - d_ph[:, -1]) * v_targ)
+            tf.reduce_sum(tf.multiply(tf.pow(gamma, tf.range(0, n_step_ph))
+                                      * (1 - tf.slice(d_ph, [0, 0], [batch_size, n_step])), r_ph), axis=1)
+            + gamma ** n_step_ph * (1 - tf.reshape(tf.slice(d_ph, [0, n_step], [batch_size, 1]), [-1])) * v_targ)
+    # q_backup = tf.stop_gradient(
+    #     tf.reduce_sum(tf.multiply([gamma ** (i) for i in range(n_step)] * (1 - d_ph), r_ph), axis=1)
+    #     + gamma ** n_step * (1 - d_ph[:, -1]) * v_targ)
     v_backup = tf.stop_gradient(min_q_pi - alpha * logp_pi)
 
     # Soft actor-critic losses
@@ -320,6 +328,7 @@ def sac_n_step(env_name, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
                          a_ph: batch['acts'],
                          r_ph: batch['rews'],
                          d_ph: batch['done'],
+                         n_step_ph: n_step
                          }
             outs = sess.run(step_ops, feed_dict)
             logger.store(LossPi=outs[0], LossQ1=outs[1], LossQ2=outs[2],
@@ -341,6 +350,7 @@ def sac_n_step(env_name, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
                                  a_ph: batch['acts'],
                                  r_ph: batch['rews'],
                                  d_ph: batch['done'],
+                                 n_step_ph: n_step
                                  }
                     outs = sess.run(step_ops, feed_dict)
                     logger.store(LossPi=outs[0], LossQ1=outs[1], LossQ2=outs[2],
