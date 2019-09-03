@@ -70,6 +70,7 @@ class ReplayBuffer:
         for d_i in range(done_index.shape[1]):
             x, y=done_index[:, d_i]
             batch_done[x, y:] = 1
+        batch_done = np.hstack((np.zeros((batch_size, 1)), batch_done))
         return dict(obs1=batch_obs1[:,0,:],
                     obs2=batch_obs2[:,-1,:],
                     acts=batch_acts[:,0,:],
@@ -226,11 +227,9 @@ def td3_n_step(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), see
     # Bellman backup for Q functions, using Clipped Double-Q targets
     min_q_targ = tf.minimum(q1_targ, q2_targ)
     backup = tf.stop_gradient(
-        tf.reduce_sum(tf.multiply(tf.pow(gamma, tf.range(0, n_step_ph)) * (1 - d_ph), r_ph), axis=1)
-        + gamma ** n_step_ph * (1 - d_ph[:, -1]) * min_q_targ)
-    # backup = tf.stop_gradient(
-    #     tf.reduce_sum(tf.multiply(tf.pow(gamma, tf.range(1, n_step_ph + 1)) * (1 - d_ph), r_ph), axis=1)
-    #     + gamma ** n_step_ph * (1 - d_ph[:, -1]) * min_q_targ)
+        tf.reduce_sum(tf.multiply(tf.pow(gamma, tf.range(0, n_step_ph))
+                                  * (1 - tf.slice(d_ph, [0, 0], [batch_size, n_step])), r_ph), axis=1)
+        + gamma ** n_step_ph * (1 - tf.reshape(tf.slice(d_ph, [0, n_step], [batch_size, 1]), [-1])) * min_q_targ)
 
     # TD3 losses
     pi_loss = -tf.reduce_mean(q1_pi)
