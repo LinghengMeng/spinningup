@@ -325,6 +325,7 @@ def sac_n_step(env_name, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
                          a_ph: batch['acts'],
                          r_ph: batch['rews'],
                          d_ph: batch['done'],
+                         n_step_ph: n_step
                          }
             outs = sess.run(step_ops, feed_dict)
             logger.store(LossPi=outs[0], LossQ1=outs[1],
@@ -346,6 +347,7 @@ def sac_n_step(env_name, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), s
                                  a_ph: batch['acts'],
                                  r_ph: batch['rews'],
                                  d_ph: batch['done'],
+                                 n_step_ph: n_step
                                  }
                     outs = sess.run(step_ops, feed_dict)
                     logger.store(LossPi=outs[0], LossQ1=outs[1],
