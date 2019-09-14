@@ -1,7 +1,7 @@
 import os.path as osp
 import numpy as np
 import tensorflow as tf
-import roboschool
+# import roboschool
 import pybulletgym
 import gym
 import spinup.algos.ddpg_n_step.modified_envs
@@ -82,7 +82,6 @@ class ReplayBuffer:
                     done=batch_done)
 
     def sample_batch_multihead_n_step(self, batch_size=32,
-                                      n_step_start=1,
                                       n_step_end=1):
         """
         return training batch for n-step experiences
@@ -116,7 +115,7 @@ class ReplayBuffer:
         # TODO: obs2
         # import pdb; pdb.set_trace()
         return dict(obs1=batch_obs1[:, 0, :],
-                    obs2=batch_obs2[:, n_step_start-1:n_step_end, :],
+                    obs2=batch_obs2[:, :n_step_end, :],
                     acts=batch_acts[:, 0, :],
                     rews=batch_rews,
                     done=batch_done)
@@ -128,8 +127,12 @@ Multi-head n-step Deep Deterministic Policy Gradient (DDPG)
 """
 def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 0,
                           steps_per_epoch=5000, epochs=100, replay_size=int(1e6),
-                          n_step=1,
-                          multi_head_start = 1, multi_head_end = 5, omit_top_k_Q = 2,
+                          reward_scale = 1,
+                          multi_head_multi_step_size = [1, 2, 3, 4, 5],
+                          omit_top_k_Q = 2, omit_low_k_Q = 1,
+                          separate_action_and_prediction = False,
+                          multi_head_bootstrapping = False,
+                          target_policy_smoothing=True, target_noise = 0.2, noise_clip = 0.5,
                           random_n_step=False, random_n_step_low=1, random_n_step_high=5,
                           gamma=0.99, without_delay_train=False, obs_noise_scale=0,
                           nonstationary_env=False,
@@ -223,11 +226,12 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
     ac_kwargs['action_space'] = env.action_space
 
     # Inputs to computation graph
-    multi_head_size = multi_head_end - (multi_head_start - 1)
+    multi_head_size = len(multi_head_multi_step_size)
 
     x_ph = tf.placeholder(dtype=tf.float32, shape=(None, obs_dim))
     a_ph = tf.placeholder(dtype=tf.float32, shape=(None, act_dim))
-    x2_ph = tf.placeholder(dtype=tf.float32, shape=(None, multi_head_size, obs_dim))
+    # TODO: use different mini-batch
+    x2_ph = tf.placeholder(dtype=tf.float32, shape=(None, max(multi_head_multi_step_size), obs_dim))
     r_ph = tf.placeholder(dtype=tf.float32, shape=(None, None))
     d_ph = tf.placeholder(dtype=tf.float32, shape=(None, None))
     n_step_ph = tf.placeholder(dtype=tf.float32, shape=())
@@ -267,14 +271,37 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
         # Set training=False to ignore dropout for backup target value
         # Crucial: feed target networks with different next n-step observation
         multihead_q_pi_targ = []
-        for head_i in range(multi_head_size):
-            head_x2_ph = tf.squeeze(tf.slice(x2_ph, [0, head_i,0], [batch_size, 1, obs_dim]), axis=1)
+        # for head_i in range(multi_head_size):
+        for h_i, n_step in enumerate(multi_head_multi_step_size):
+            print('Head-{}: {}-step'.format(h_i, n_step))
+            head_x2_ph = tf.squeeze(tf.slice(x2_ph, [0, n_step-1,0], [batch_size, 1, obs_dim]), axis=1)
 
-            head_pi_targ = act_limit * actor_targ(head_x2_ph)
-            multihead_q_pi_targ.append(tf.squeeze(multihead_critic_targ(tf.concat([head_x2_ph, head_pi_targ], axis=-1))[head_i], axis=1))
+            _ = actor_targ(head_x2_ph) # just for copy parameter
+            if separate_action_and_prediction:
+                head_pi_targ = act_limit * actor(head_x2_ph)
+            else:
+                head_pi_targ = act_limit * actor_targ(head_x2_ph)
 
-            # TODO: all heads calculate n-step bootstrapping
-            # multihead_q_pi_targ = [tf.squeeze(head_out_targ, axis=1) for head_out_targ in multihead_critic_targ(tf.concat([head_x2_ph, head_pi_targ], axis=-1))]
+            if target_policy_smoothing:
+                # Target policy smoothing, by adding clipped noise to target actions
+                epsilon = tf.random_normal(tf.shape(head_pi_targ), stddev=target_noise)
+                epsilon = tf.clip_by_value(epsilon, -noise_clip, noise_clip)
+                head_pi_targ = head_pi_targ + epsilon
+                head_pi_targ = tf.clip_by_value(head_pi_targ, -act_limit, act_limit)
+
+            if multi_head_bootstrapping:
+                # all heads calculate n-step bootstrapping,
+                #  omit overestimation and underestimation of n-step bootstrapped Q
+                after_omit_overestimation = tf.math.top_k(
+                    -tf.squeeze(tf.stack(multihead_critic_targ(tf.concat([head_x2_ph, head_pi_targ], axis=-1)), axis=2),
+                                axis=1), multi_head_size - omit_top_k_Q)[0]
+                after_omit_underestimation = tf.math.top_k(-after_omit_overestimation,
+                                                           multi_head_size - omit_top_k_Q - omit_low_k_Q)[0]
+                multihead_q_pi_targ.append(tf.reduce_mean(after_omit_underestimation, axis=1))
+            else:
+                multihead_q_pi_targ.append(
+                    tf.squeeze(multihead_critic_targ(tf.concat([head_x2_ph, head_pi_targ], axis=-1))[h_i], axis=1))
+
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
@@ -287,12 +314,11 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
     multihead_q_loss_list = []
     multihead_q_pi_loss_list = []
     multihead_backup_list = []
-    for n_step in range(multi_head_start, multi_head_end+1):
-        head_q = multihead_q[n_step-multi_head_start]
-        head_q_pi_targ = multihead_q_pi_targ[n_step-multi_head_start]
-        head_q_pi = multihead_q_pi[n_step-multi_head_start]
+    for h_i, n_step in enumerate(multi_head_multi_step_size):
+        head_q = multihead_q[h_i]
+        head_q_pi_targ = multihead_q_pi_targ[h_i]
+        head_q_pi = multihead_q_pi[h_i]
 
-        print(n_step)
         head_backup = tf.stop_gradient(tf.reduce_sum(tf.multiply(tf.pow(gamma, tf.range(0, n_step, dtype=tf.float32))
                                                                  * (1 - tf.slice(d_ph, [0, 0], [batch_size, n_step])),
                                                                  tf.slice(r_ph, [0, 0], [batch_size, n_step])), axis=1)
@@ -304,27 +330,13 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
     # DDPG losses
     # 1. pi loss
     # pi_loss = tf.reduce_mean(multihead_q_pi_loss_list) # Works, but not stable
-    # pi_loss = tf.reduce_sum(multihead_q_pi_loss_list)
-    # import pdb; pdb.set_trace()
-    # pi_loss = tf.reduce_sum(tf.math.top_k(tf.stack(multihead_q_pi_loss_list, axis=1), multi_head_size - 3)[0])
 
     # Works good, need to test generalization
     pi_loss = tf.reduce_mean(tf.math.top_k(-tf.stack(multihead_q_pi, axis=1), multi_head_size - omit_top_k_Q)[0])
 
-    # import pdb; pdb.set_trace()
     # 2. q loss
-    q_loss = tf.reduce_mean(multihead_q_loss_list)
-    # q_loss = tf.reduce_min(multihead_q_loss_list)
-
-    # backup = tf.reduce_mean(tf.math.top_k(tf.stack(multihead_backup_list, axis=1), multi_head_size - 3)[0], axis=1)
-    # q_loss_aggregation = []
-    # for head_q in multihead_q:
-    #     q_loss_aggregation.append(tf.reduce_mean((head_q-backup)**2))
-    # q_loss = tf.reduce_sum(q_loss_aggregation)
-
-    # q_loss = tf.reduce_sum(multihead_q_loss_list)
-    # q_loss = tf.reduce_sum(tf.math.top_k(tf.math.negative(multihead_q_loss_list), multi_head_size-1))
-    # q_loss = tf.reduce_sum((multihead_q - tf.reduce_mean(multihead_backup_list))**2)
+    q_loss = tf.reduce_mean(multihead_q_loss_list)  # works
+    # q_loss = tf.reduce_sum(multihead_q_loss_list) # Works, but not as good as reduce_mean
 
     # Separate train ops for pi, q
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
@@ -383,7 +395,7 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
         else:
             a = env.action_space.sample()
 
-        #env.render()
+        # env.render()
         # Manipulate environment
         change_scale = 1/8
         if nonstationary_env == True:
@@ -419,7 +431,7 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        replay_buffer.store(o, a, r, o2, d)
+        replay_buffer.store(o, a, reward_scale*r, o2, d)
 
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
@@ -429,9 +441,7 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
             if random_n_step:
                 n_step = np.random.randint(random_n_step_low, random_n_step_high + 1, 1)[0]
 
-            batch = replay_buffer.sample_batch_multihead_n_step(batch_size,
-                                                                n_step_start=multi_head_start,
-                                                                n_step_end=multi_head_end)
+            batch = replay_buffer.sample_batch_multihead_n_step(batch_size, n_step_end=max(multi_head_multi_step_size))
             feed_dict = {x_ph: batch['obs1'],
                          x2_ph: batch['obs2'],
                          a_ph: batch['acts'],
@@ -441,12 +451,15 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
             # import pdb; pdb.set_trace()
             # Q-learning update
             outs = sess.run([multihead_q_loss_list, multihead_q, train_q_op], feed_dict)
-            logger.store(**{'LossQ{}'.format(h_i): outs[0][h_i] for h_i in range(multi_head_size)})
-            logger.store(**{'QVals{}'.format(h_i): outs[1][h_i] for h_i in range(multi_head_size)})
+            logger.store(**{'LossQ{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]): outs[0][h_i] for h_i in
+                            range(multi_head_size)})
+            logger.store(**{'QVals{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]): outs[1][h_i] for h_i in
+                            range(multi_head_size)})
 
             # Policy update
             outs = sess.run([multihead_q_pi_loss_list, train_pi_op, target_update], feed_dict)
-            logger.store(**{'LossPi{}'.format(h_i): outs[0][h_i] for h_i in range(multi_head_size)})
+            logger.store(**{'LossPi{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]): outs[0][h_i] for h_i in
+                            range(multi_head_size)})
 
 
         if d or (ep_len == max_ep_len):
@@ -458,9 +471,7 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
                 for _ in range(ep_len):
                     if random_n_step:
                         n_step = np.random.randint(random_n_step_low, random_n_step_high+1, 1)[0]
-                    batch = replay_buffer.sample_batch_multihead_n_step(batch_size,
-                                                                        n_step_start=multi_head_start,
-                                                                        n_step_end=multi_head_end)
+                    batch = replay_buffer.sample_batch_multihead_n_step(batch_size, n_step_end=max(multi_head_multi_step_size))
                     feed_dict = {x_ph: batch['obs1'],
                                  x2_ph: batch['obs2'],
                                  a_ph: batch['acts'],
@@ -470,12 +481,15 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
 
                     # Q-learning update
                     outs = sess.run([multihead_q_loss_list, multihead_q, train_q_op], feed_dict)
-                    logger.store(**{'LossQ{}'.format(h_i): outs[0][h_i] for h_i in range(multi_head_size)})
-                    logger.store(**{'QVals{}'.format(h_i): outs[1][h_i] for h_i in range(multi_head_size)})
+                    logger.store(**{'LossQ{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]): outs[0][h_i] for h_i in
+                                    range(multi_head_size)})
+                    logger.store(**{'QVals{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]): outs[1][h_i] for h_i in
+                                    range(multi_head_size)})
 
                     # Policy update
                     outs = sess.run([multihead_q_pi_loss_list, train_pi_op, target_update], feed_dict)
-                    logger.store(**{'LossPi{}'.format(h_i): outs[0][h_i] for h_i in range(multi_head_size)})
+                    logger.store(**{'LossPi{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]): outs[0][h_i] for h_i in
+                                    range(multi_head_size)})
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -499,11 +513,11 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
             logger.log_tabular('TestEpLen', average_only=True)
             logger.log_tabular('TotalEnvInteracts', t)
             for h_i in range(multi_head_size):
-                logger.log_tabular('QVals{}'.format(h_i), average_only=True)
+                logger.log_tabular('QVals{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]), average_only=True)
             for h_i in range(multi_head_size):
-                logger.log_tabular('LossPi{}'.format(h_i), average_only=True)
+                logger.log_tabular('LossPi{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]), average_only=True)
             for h_i in range(multi_head_size):
-                logger.log_tabular('LossQ{}'.format(h_i), average_only=True)
+                logger.log_tabular('LossQ{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]), average_only=True)
             logger.log_tabular('Time', time.time()-start_time)
             logger.dump_tabular()
 
@@ -518,10 +532,18 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--exp_name', type=str, default='ddpg_multihead_n_step')
     parser.add_argument('--new_mlp', action='store_true')
-    parser.add_argument('--n_step', type=int, default=5)
-    parser.add_argument('--multi_head_start', type=int, default=1)
-    parser.add_argument('--multi_head_end', type=int, default=5)
+    parser.add_argument('--reward_scale', type=float, default=1)
+
+    parser.add_argument('--multi_head_multi_step_size', nargs='+', type=int, default=[1, 2, 3, 4, 5])
     parser.add_argument('--omit_top_k_Q', type=int, default=2)
+    parser.add_argument('--omit_low_k_Q', type=int, default=0)
+    parser.add_argument('--separate_action_and_prediction', action='store_true')
+    parser.add_argument('--multi_head_bootstrapping', action='store_true')
+
+    parser.add_argument('--target_policy_smoothing', action='store_true')
+    parser.add_argument('--target_noise', type=float, default=0.2)
+    parser.add_argument('--noise_clip', type=float, default=0.5)
+
     parser.add_argument('--random_n_step', action='store_true')
     parser.add_argument('--random_n_step_low', type=int, default=1)
     parser.add_argument('--random_n_step_high', type=int, default=5)
@@ -560,9 +582,13 @@ if __name__ == '__main__':
 
     ddpg_multihead_n_step(env_name=args.env, new_mlp=args.new_mlp, dropout_rate=args.dropout_rate,
                           ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
-                          n_step=args.n_step,
-                          multi_head_start=args.multi_head_start, multi_head_end=args.multi_head_end,
-                          omit_top_k_Q=args.omit_top_k_Q,
+                          reward_scale=args.reward_scale,
+                          multi_head_multi_step_size=args.multi_head_multi_step_size,
+                          omit_top_k_Q=args.omit_top_k_Q, omit_low_k_Q=args.omit_low_k_Q,
+                          separate_action_and_prediction=args.separate_action_and_prediction,
+                          multi_head_bootstrapping=args.multi_head_bootstrapping,
+                          target_policy_smoothing=args.target_policy_smoothing,
+                          target_noise=args.target_noise, noise_clip=args.noise_clip,
                           random_n_step=args.random_n_step,
                           random_n_step_low=args.random_n_step_low, random_n_step_high=args.random_n_step_high,
                           replay_size=args.replay_size,
