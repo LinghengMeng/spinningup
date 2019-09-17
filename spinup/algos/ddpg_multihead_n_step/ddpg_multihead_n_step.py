@@ -1,7 +1,7 @@
 import os.path as osp
 import numpy as np
 import tensorflow as tf
-# import roboschool
+import roboschool
 import pybulletgym
 import gym
 import spinup.algos.ddpg_n_step.modified_envs
