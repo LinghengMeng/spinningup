@@ -130,6 +130,7 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
                           reward_scale = 1,
                           multi_head_multi_step_size = [1, 2, 3, 4, 5],
                           omit_top_k_Q = 2, omit_low_k_Q = 1,
+                          multihead_q_std_penalty = 0.2,
                           separate_action_and_prediction = False,
                           multi_head_bootstrapping = False,
                           target_policy_smoothing=True, target_noise = 0.2, noise_clip = 0.5,
@@ -289,6 +290,7 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
                 head_pi_targ = head_pi_targ + epsilon
                 head_pi_targ = tf.clip_by_value(head_pi_targ, -act_limit, act_limit)
 
+            # TODO: test multi-head bootstrapping with StdQPenalty
             if multi_head_bootstrapping:
                 # all heads calculate n-step bootstrapping,
                 #  omit overestimation and underestimation of n-step bootstrapped Q
@@ -335,8 +337,26 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
     pi_loss = tf.reduce_mean(tf.math.top_k(-tf.stack(multihead_q_pi, axis=1), multi_head_size - omit_top_k_Q)[0])
 
     # 2. q loss
-    q_loss = tf.reduce_mean(multihead_q_loss_list)  # works
+    # q_loss = tf.reduce_mean(multihead_q_loss_list)  # works
     # q_loss = tf.reduce_sum(multihead_q_loss_list) # Works, but not as good as reduce_mean
+
+    # currently the best, and the policy has approximately monotonic improvement
+    # TODO: multihead_q_std_penalty should be dynamically changed
+    all_q = tf.stack(multihead_q, axis=1)
+    all_q_backup = tf.stack(multihead_backup_list, axis=1)
+    # q_loss = tf.reduce_mean(tf.reduce_mean((all_q - all_q_backup)**2, axis=1) +
+    #                         multihead_q_std_penalty * tf.math.reduce_std(all_q, axis=1))
+
+    # variance penalty is better than standard deviation penalty
+    # q_loss = tf.reduce_mean(tf.reduce_mean((all_q - all_q_backup) ** 2, axis=1) +
+    #                         multihead_q_std_penalty * tf.math.reduce_variance(all_q, axis=1))
+
+    # TODO： test reduce_sum and reduce_var
+    q_loss = tf.reduce_mean(tf.reduce_sum((all_q - all_q_backup) ** 2, axis=1) +
+                            multihead_q_std_penalty * tf.math.reduce_variance(all_q, axis=1))
+
+    # q_loss = tf.reduce_mean((all_q - all_q_backup) ** 2) +\
+    #          tf.reduce_mean(multihead_q_std_penalty * tf.math.reduce_std(all_q, axis=1))
 
     # Separate train ops for pi, q
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
@@ -535,10 +555,13 @@ if __name__ == '__main__':
     parser.add_argument('--reward_scale', type=float, default=1)
 
     parser.add_argument('--multi_head_multi_step_size', nargs='+', type=int, default=[1, 2, 3, 4, 5])
-    parser.add_argument('--omit_top_k_Q', type=int, default=2)
+    parser.add_argument('--omit_top_k_Q', type=int, default=0)
     parser.add_argument('--omit_low_k_Q', type=int, default=0)
+    parser.add_argument('--multihead_q_std_penalty', type=float, default=0.2)
     parser.add_argument('--separate_action_and_prediction', action='store_true')
     parser.add_argument('--multi_head_bootstrapping', action='store_true')
+
+    parser.add_argument('--act_noise', type=float, default=0.1)
 
     parser.add_argument('--target_policy_smoothing', action='store_true')
     parser.add_argument('--target_noise', type=float, default=0.2)
@@ -585,8 +608,10 @@ if __name__ == '__main__':
                           reward_scale=args.reward_scale,
                           multi_head_multi_step_size=args.multi_head_multi_step_size,
                           omit_top_k_Q=args.omit_top_k_Q, omit_low_k_Q=args.omit_low_k_Q,
+                          multihead_q_std_penalty=args.multihead_q_std_penalty,
                           separate_action_and_prediction=args.separate_action_and_prediction,
                           multi_head_bootstrapping=args.multi_head_bootstrapping,
+                          act_noise=args.act_noise,
                           target_policy_smoothing=args.target_policy_smoothing,
                           target_noise=args.target_noise, noise_clip=args.noise_clip,
                           random_n_step=args.random_n_step,
