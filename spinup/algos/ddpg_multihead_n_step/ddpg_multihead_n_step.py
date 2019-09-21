@@ -125,11 +125,16 @@ class ReplayBuffer:
 Multi-head n-step Deep Deterministic Policy Gradient (DDPG)
 
 """
-def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_rate = 0,
+def ddpg_multihead_n_step(env_name,
+                          actor_hidden_layers=[300, 300],
+                          critic_shared_hidden_layers=[300],
+                          critic_separated_head_hidden_layers=[300],
+                          seed=0, dropout_rate = 0,
                           steps_per_epoch=5000, epochs=100, replay_size=int(1e6),
                           reward_scale = 1,
                           multi_head_multi_step_size = [1, 2, 3, 4, 5],
-                          omit_top_k_Q = 2, omit_low_k_Q = 1,
+                          actor_omit_top_k_Q = 2, actor_omit_low_k_Q = 1,
+                          critic_omit_top_k_Q = 2, critic_omit_low_k_Q = 1,
                           multihead_q_std_penalty = 0.2,
                           separate_action_and_prediction = False,
                           multi_head_bootstrapping = False,
@@ -224,7 +229,6 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
     act_limit = env.action_space.high[0]
 
     # Share information about action space with policy architecture
-    ac_kwargs['action_space'] = env.action_space
 
     # Inputs to computation graph
     multi_head_size = len(multi_head_multi_step_size)
@@ -237,11 +241,11 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
     d_ph = tf.placeholder(dtype=tf.float32, shape=(None, None))
     n_step_ph = tf.placeholder(dtype=tf.float32, shape=())
 
-    actor_hidden_sizes = list(ac_kwargs['hidden_sizes'])
+    actor_hidden_sizes = actor_hidden_layers
     actor_hidden_activation = tf.keras.activations.relu
     actor_output_activation = tf.keras.activations.tanh
-    critic_shared_hidden_sizes = [300]
-    critic_head_hidden_sizes = [300]
+    critic_shared_hidden_sizes = critic_shared_hidden_layers
+    critic_head_hidden_sizes = critic_separated_head_hidden_layers
     critic_hidden_activation = tf.keras.activations.relu
     critic_output_activation = tf.keras.activations.linear
 
@@ -296,9 +300,9 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
                 #  omit overestimation and underestimation of n-step bootstrapped Q
                 after_omit_overestimation = tf.math.top_k(
                     -tf.squeeze(tf.stack(multihead_critic_targ(tf.concat([head_x2_ph, head_pi_targ], axis=-1)), axis=2),
-                                axis=1), multi_head_size - omit_top_k_Q)[0]
+                                axis=1), multi_head_size - critic_omit_top_k_Q)[0]
                 after_omit_underestimation = tf.math.top_k(-after_omit_overestimation,
-                                                           multi_head_size - omit_top_k_Q - omit_low_k_Q)[0]
+                                                           multi_head_size - critic_omit_top_k_Q - critic_omit_low_k_Q)[0]
                 multihead_q_pi_targ.append(tf.reduce_mean(after_omit_underestimation, axis=1))
             else:
                 multihead_q_pi_targ.append(
@@ -329,25 +333,42 @@ def ddpg_multihead_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, drop
         multihead_q_loss_list.append(tf.reduce_mean((head_q-head_backup)**2))
         multihead_q_pi_loss_list.append(-tf.reduce_mean(head_q_pi))
 
+
     # DDPG losses
     # 1. pi loss
+    all_q_pi = tf.stack(multihead_q_pi, axis=1)
     # pi_loss = tf.reduce_mean(multihead_q_pi_loss_list) # Works, but not stable
 
     # Works good, need to test generalization
-    pi_loss = tf.reduce_mean(tf.math.top_k(-tf.stack(multihead_q_pi, axis=1), multi_head_size - omit_top_k_Q)[0])
+    # pi_loss = tf.reduce_mean(tf.math.top_k(-all_q_pi, multi_head_size - omit_top_k_Q)[0])
+
+    pi_loss = tf.reduce_mean(tf.reduce_mean(tf.math.top_k(-all_q_pi,
+                                                          multi_head_size - actor_omit_top_k_Q)[0], axis=1))
+    # # TODO：test, seems not work
+    # pi_loss = tf.reduce_mean(tf.reduce_mean(tf.math.top_k(-all_q_pi, multi_head_size - actor_omit_top_k_Q)[0], axis=1) +
+    #                          multihead_q_std_penalty * tf.math.reduce_variance(all_q_pi, axis=1))
+
+    # # import pdb; pdb.set_trace()
+    # pi_loss = tf.reduce_sum(tf.reduce_mean(tf.math.top_k(-tf.stack(multihead_q_pi, axis=1), multi_head_size - omit_top_k_Q)[0], axis=0))
+
+    # pi_loss = tf.reduce_mean(-multihead_q_pi[0]) # Too slow
+
+    # slow
+    # pi_loss = tf.reduce_mean(tf.reduce_sum(tf.math.top_k(-tf.stack(multihead_q_pi, axis=1),
+    #                                                       multi_head_size - omit_top_k_Q)[0], axis=1))
 
     # 2. q loss
+    all_q = tf.stack(multihead_q, axis=1)
+    all_q_backup = tf.stack(multihead_backup_list, axis=1)
     # q_loss = tf.reduce_mean(multihead_q_loss_list)  # works
     # q_loss = tf.reduce_sum(multihead_q_loss_list) # Works, but not as good as reduce_mean
 
     # currently the best, and the policy has approximately monotonic improvement
     # TODO: multihead_q_std_penalty should be dynamically changed
-    all_q = tf.stack(multihead_q, axis=1)
-    all_q_backup = tf.stack(multihead_backup_list, axis=1)
     # q_loss = tf.reduce_mean(tf.reduce_mean((all_q - all_q_backup)**2, axis=1) +
     #                         multihead_q_std_penalty * tf.math.reduce_std(all_q, axis=1))
 
-    # variance penalty is better than standard deviation penalty
+    # # variance penalty is better than standard deviation penalty
     # q_loss = tf.reduce_mean(tf.reduce_mean((all_q - all_q_backup) ** 2, axis=1) +
     #                         multihead_q_std_penalty * tf.math.reduce_variance(all_q, axis=1))
 
@@ -545,21 +566,23 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
-    parser.add_argument('--hid', type=int, default=300)
-    parser.add_argument('--l', type=int, default=1)
+    parser.add_argument('--actor_hidden_layers', nargs='+', type=int, default=[300, 300])
+    parser.add_argument('--critic_shared_hidden_layers', nargs='+', type=int, default=[300])
+    parser.add_argument('--critic_separated_head_hidden_layers', nargs='+', type=int, default=[300])
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--exp_name', type=str, default='ddpg_multihead_n_step')
-    parser.add_argument('--new_mlp', action='store_true')
     parser.add_argument('--reward_scale', type=float, default=1)
 
     parser.add_argument('--multi_head_multi_step_size', nargs='+', type=int, default=[1, 2, 3, 4, 5])
-    parser.add_argument('--omit_top_k_Q', type=int, default=0)
-    parser.add_argument('--omit_low_k_Q', type=int, default=0)
+    parser.add_argument('--actor_omit_top_k_Q', type=int, default=0)
+    parser.add_argument('--actor_omit_low_k_Q', type=int, default=0)
     parser.add_argument('--multihead_q_std_penalty', type=float, default=0.2)
     parser.add_argument('--separate_action_and_prediction', action='store_true')
     parser.add_argument('--multi_head_bootstrapping', action='store_true')
+    parser.add_argument('--critic_omit_top_k_Q', type=int, default=0)
+    parser.add_argument('--critic_omit_low_k_Q', type=int, default=0)
 
     parser.add_argument('--act_noise', type=float, default=0.1)
 
@@ -603,11 +626,14 @@ if __name__ == '__main__':
     if args.hardcopy_target_nn:
         polyak = 0
 
-    ddpg_multihead_n_step(env_name=args.env, new_mlp=args.new_mlp, dropout_rate=args.dropout_rate,
-                          ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
+    ddpg_multihead_n_step(env_name=args.env, dropout_rate=args.dropout_rate,
+                          actor_hidden_layers=args.actor_hidden_layers,
+                          critic_shared_hidden_layers=args.critic_shared_hidden_layers,
+                          critic_separated_head_hidden_layers=args.critic_separated_head_hidden_layers,
                           reward_scale=args.reward_scale,
                           multi_head_multi_step_size=args.multi_head_multi_step_size,
-                          omit_top_k_Q=args.omit_top_k_Q, omit_low_k_Q=args.omit_low_k_Q,
+                          actor_omit_top_k_Q=args.actor_omit_top_k_Q, actor_omit_low_k_Q=args.actor_omit_low_k_Q,
+                          critic_omit_top_k_Q=args.critic_omit_top_k_Q, critic_omit_low_k_Q=args.critic_omit_low_k_Q,
                           multihead_q_std_penalty=args.multihead_q_std_penalty,
                           separate_action_and_prediction=args.separate_action_and_prediction,
                           multi_head_bootstrapping=args.multi_head_bootstrapping,
