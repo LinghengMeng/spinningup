@@ -337,13 +337,16 @@ def ddpg_multihead_n_step(env_name,
     # DDPG losses
     # 1. pi loss
     all_q_pi = tf.stack(multihead_q_pi, axis=1)
+
     # pi_loss = tf.reduce_mean(multihead_q_pi_loss_list) # Works, but not stable
 
     # Works good, need to test generalization
     # pi_loss = tf.reduce_mean(tf.math.top_k(-all_q_pi, multi_head_size - omit_top_k_Q)[0])
 
-    pi_loss = tf.reduce_mean(tf.reduce_mean(tf.math.top_k(-all_q_pi,
-                                                          multi_head_size - actor_omit_top_k_Q)[0], axis=1))
+    after_omit_overestimation_for_actor = tf.math.top_k(-all_q_pi, multi_head_size - actor_omit_top_k_Q)[0]
+    after_omit_underestimation_for_actor = tf.math.top_k(-after_omit_overestimation_for_actor, multi_head_size - actor_omit_top_k_Q - actor_omit_low_k_Q)[0]
+    pi_loss = tf.reduce_mean(tf.reduce_mean(-after_omit_underestimation_for_actor, axis=1))
+
     # # TODO：test, seems not work
     # pi_loss = tf.reduce_mean(tf.reduce_mean(tf.math.top_k(-all_q_pi, multi_head_size - actor_omit_top_k_Q)[0], axis=1) +
     #                          multihead_q_std_penalty * tf.math.reduce_variance(all_q_pi, axis=1))
@@ -353,9 +356,9 @@ def ddpg_multihead_n_step(env_name,
 
     # pi_loss = tf.reduce_mean(-multihead_q_pi[0]) # Too slow
 
-    # slow
-    # pi_loss = tf.reduce_mean(tf.reduce_sum(tf.math.top_k(-tf.stack(multihead_q_pi, axis=1),
-    #                                                       multi_head_size - omit_top_k_Q)[0], axis=1))
+    # # slow
+    # pi_loss = tf.reduce_mean(tf.reduce_sum(tf.math.top_k(-all_q_pi,
+    #                                                       multi_head_size - actor_omit_top_k_Q)[0], axis=1))
 
     # 2. q loss
     all_q = tf.stack(multihead_q, axis=1)
@@ -368,13 +371,13 @@ def ddpg_multihead_n_step(env_name,
     # q_loss = tf.reduce_mean(tf.reduce_mean((all_q - all_q_backup)**2, axis=1) +
     #                         multihead_q_std_penalty * tf.math.reduce_std(all_q, axis=1))
 
-    # # variance penalty is better than standard deviation penalty
-    # q_loss = tf.reduce_mean(tf.reduce_mean((all_q - all_q_backup) ** 2, axis=1) +
-    #                         multihead_q_std_penalty * tf.math.reduce_variance(all_q, axis=1))
-
-    # TODO： test reduce_sum and reduce_var
-    q_loss = tf.reduce_mean(tf.reduce_sum((all_q - all_q_backup) ** 2, axis=1) +
+    # variance penalty is better than standard deviation penalty
+    q_loss = tf.reduce_mean(tf.reduce_mean((all_q - all_q_backup) ** 2, axis=1) +
                             multihead_q_std_penalty * tf.math.reduce_variance(all_q, axis=1))
+
+    # # TODO： test reduce_sum and reduce_var
+    # q_loss = tf.reduce_mean(tf.reduce_sum((all_q - all_q_backup) ** 2, axis=1) +
+    #                         multihead_q_std_penalty * tf.math.reduce_variance(all_q, axis=1))
 
     # q_loss = tf.reduce_mean((all_q - all_q_backup) ** 2) +\
     #          tf.reduce_mean(multihead_q_std_penalty * tf.math.reduce_std(all_q, axis=1))
@@ -578,7 +581,7 @@ if __name__ == '__main__':
     parser.add_argument('--multi_head_multi_step_size', nargs='+', type=int, default=[1, 2, 3, 4, 5])
     parser.add_argument('--actor_omit_top_k_Q', type=int, default=0)
     parser.add_argument('--actor_omit_low_k_Q', type=int, default=0)
-    parser.add_argument('--multihead_q_std_penalty', type=float, default=0.2)
+    parser.add_argument('--multihead_q_std_penalty', type=float, default=0)
     parser.add_argument('--separate_action_and_prediction', action='store_true')
     parser.add_argument('--multi_head_bootstrapping', action='store_true')
     parser.add_argument('--critic_omit_top_k_Q', type=int, default=0)
