@@ -363,24 +363,25 @@ def ddpg_multihead_n_step(env_name,
     # 2. q loss
     all_q = tf.stack(multihead_q, axis=1)
     all_q_backup = tf.stack(multihead_backup_list, axis=1)
-    # q_loss = tf.reduce_mean(multihead_q_loss_list)  # works
-    # q_loss = tf.reduce_sum(multihead_q_loss_list) # Works, but not as good as reduce_mean
+    # q_loss = tf.reduce_sum((all_q - all_q_backup) ** 2)
+    # q_loss = tf.reduce_mean((all_q - all_q_backup) ** 2) # (Currently the best) Works good for Swimmer-s0
+    # q_loss = tf.reduce_mean(multihead_q_loss_list)     # works
+    q_loss = tf.reduce_sum(multihead_q_loss_list)      # Works good for Swimmer-s3
 
     # currently the best, and the policy has approximately monotonic improvement
     # TODO: multihead_q_std_penalty should be dynamically changed
     # q_loss = tf.reduce_mean(tf.reduce_mean((all_q - all_q_backup)**2, axis=1) +
     #                         multihead_q_std_penalty * tf.math.reduce_std(all_q, axis=1))
 
-    # variance penalty is better than standard deviation penalty
-    q_loss = tf.reduce_mean(tf.reduce_mean((all_q - all_q_backup) ** 2, axis=1) +
-                            multihead_q_std_penalty * tf.math.reduce_variance(all_q, axis=1))
+    # # variance penalty is better than standard deviation penalty
+    # q_loss = tf.reduce_mean(tf.reduce_mean((all_q - all_q_backup) ** 2, axis=1) +
+    #                         multihead_q_std_penalty * tf.math.reduce_variance(all_q, axis=1))
 
     # # TODO： test reduce_sum and reduce_var
     # q_loss = tf.reduce_mean(tf.reduce_sum((all_q - all_q_backup) ** 2, axis=1) +
     #                         multihead_q_std_penalty * tf.math.reduce_variance(all_q, axis=1))
 
-    # q_loss = tf.reduce_mean((all_q - all_q_backup) ** 2) +\
-    #          tf.reduce_mean(multihead_q_std_penalty * tf.math.reduce_std(all_q, axis=1))
+
 
     # Separate train ops for pi, q
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
@@ -557,7 +558,7 @@ def ddpg_multihead_n_step(env_name,
             logger.log_tabular('TestEpLen', average_only=True)
             logger.log_tabular('TotalEnvInteracts', t)
             for h_i in range(multi_head_size):
-                logger.log_tabular('QVals{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]), average_only=True)
+                logger.log_tabular('QVals{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]), with_min_and_max=True)
             for h_i in range(multi_head_size):
                 logger.log_tabular('LossPi{}_{}Step'.format(h_i, multi_head_multi_step_size[h_i]), average_only=True)
             for h_i in range(multi_head_size):
