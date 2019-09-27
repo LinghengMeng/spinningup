@@ -135,6 +135,7 @@ def ddpg_multihead_n_step(env_name,
                           multi_head_multi_step_size = [1, 2, 3, 4, 5],
                           actor_omit_top_k_Q = 2, actor_omit_low_k_Q = 1,
                           critic_omit_top_k_Q = 2, critic_omit_low_k_Q = 1,
+                          q_loss_type = 'QLossReduceMeanMean',
                           multihead_q_std_penalty = 0.2,
                           separate_action_and_prediction = False,
                           multi_head_bootstrapping = False,
@@ -363,10 +364,15 @@ def ddpg_multihead_n_step(env_name,
     # 2. q loss
     all_q = tf.stack(multihead_q, axis=1)
     all_q_backup = tf.stack(multihead_backup_list, axis=1)
-    # q_loss = tf.reduce_sum((all_q - all_q_backup) ** 2)
-    # q_loss = tf.reduce_mean((all_q - all_q_backup) ** 2) # (Currently the best) Works good for Swimmer-s0
-    # q_loss = tf.reduce_mean(multihead_q_loss_list)     # works
-    q_loss = tf.reduce_sum(multihead_q_loss_list)      # Works good for Swimmer-s3
+
+    if q_loss_type == 'QLossReduceMeanMean':
+        q_loss = tf.reduce_mean(multihead_q_loss_list)     # works
+    elif q_loss_type == 'QLossReduceSumMean':
+        q_loss = tf.reduce_sum(multihead_q_loss_list)        # Works good for Swimmer-s3
+    elif q_loss_type == 'QLossReduceMeanAll':
+        q_loss = tf.reduce_mean((all_q - all_q_backup) ** 2) # (Currently the best) Works good for Swimmer-s0
+    elif q_loss_type == 'QLossReduceSumAll':
+        q_loss = tf.reduce_sum((all_q - all_q_backup) ** 2)
 
     # currently the best, and the policy has approximately monotonic improvement
     # TODO: multihead_q_std_penalty should be dynamically changed
@@ -587,6 +593,9 @@ if __name__ == '__main__':
     parser.add_argument('--multi_head_bootstrapping', action='store_true')
     parser.add_argument('--critic_omit_top_k_Q', type=int, default=0)
     parser.add_argument('--critic_omit_low_k_Q', type=int, default=0)
+    parser.add_argument('--q_loss_type', type=str,
+                        choices=['QLossReduceMeanMean', 'QLossReduceSumMean', 'QLossReduceMeanAll', 'QLossReduceSumAll'],
+                        default='QLossReduceMeanMean')
 
     parser.add_argument('--act_noise', type=float, default=0.1)
 
@@ -641,6 +650,7 @@ if __name__ == '__main__':
                           multihead_q_std_penalty=args.multihead_q_std_penalty,
                           separate_action_and_prediction=args.separate_action_and_prediction,
                           multi_head_bootstrapping=args.multi_head_bootstrapping,
+                          q_loss_type=args.q_loss_type,
                           act_noise=args.act_noise,
                           target_policy_smoothing=args.target_policy_smoothing,
                           target_noise=args.target_noise, noise_clip=args.noise_clip,
