@@ -342,12 +342,14 @@ if __name__ == '__main__':
     parser.add_argument('--replay_size', type=int, default=int(1e6))
     parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--exp_name', type=str, default='sac_2L_200Ep')
+    parser.add_argument('--data_dir', type=str, default='spinup_data')
     args = parser.parse_args()
 
     # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
+
     data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
-                        'spinup_data')
+                        args.data_dir)
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
 
     sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
