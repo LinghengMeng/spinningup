@@ -46,7 +46,8 @@ Soft Actor-Critic
 """
 def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0, 
         steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, 
-        polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000, 
+        polyak=0.995, lr=1e-3, alpha=0.2, batch_size=100, start_steps=10000,
+        without_delay_train=False,
         max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
 
@@ -262,24 +263,38 @@ def sac(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         # most recent observation!
         o = o2
 
+        if t > batch_size and without_delay_train:
+            batch = replay_buffer.sample_batch(batch_size)
+            feed_dict = {x_ph: batch['obs1'],
+                         x2_ph: batch['obs2'],
+                         a_ph: batch['acts'],
+                         r_ph: batch['rews'],
+                         d_ph: batch['done'],
+                         }
+            outs = sess.run(step_ops, feed_dict)
+            logger.store(LossPi=outs[0], LossQ1=outs[1], LossQ2=outs[2],
+                         LossV=outs[3], Q1Vals=outs[4], Q2Vals=outs[5],
+                         VVals=outs[6], LogPi=outs[7])
+
         if d or (ep_len == max_ep_len):
             """
             Perform all SAC updates at the end of the trajectory.
             This is a slight difference from the SAC specified in the
             original paper.
             """
-            for j in range(ep_len):
-                batch = replay_buffer.sample_batch(batch_size)
-                feed_dict = {x_ph: batch['obs1'],
-                             x2_ph: batch['obs2'],
-                             a_ph: batch['acts'],
-                             r_ph: batch['rews'],
-                             d_ph: batch['done'],
-                            }
-                outs = sess.run(step_ops, feed_dict)
-                logger.store(LossPi=outs[0], LossQ1=outs[1], LossQ2=outs[2],
-                             LossV=outs[3], Q1Vals=outs[4], Q2Vals=outs[5],
-                             VVals=outs[6], LogPi=outs[7])
+            if not without_delay_train:
+                for j in range(ep_len):
+                    batch = replay_buffer.sample_batch(batch_size)
+                    feed_dict = {x_ph: batch['obs1'],
+                                 x2_ph: batch['obs2'],
+                                 a_ph: batch['acts'],
+                                 r_ph: batch['rews'],
+                                 d_ph: batch['done'],
+                                }
+                    outs = sess.run(step_ops, feed_dict)
+                    logger.store(LossPi=outs[0], LossQ1=outs[1], LossQ2=outs[2],
+                                 LossV=outs[3], Q1Vals=outs[4], Q2Vals=outs[5],
+                                 VVals=outs[6], LogPi=outs[7])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -323,6 +338,9 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=3)
     parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--start_steps', type=int, default=10000)
+    parser.add_argument('--replay_size', type=int, default=int(1e6))
+    parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--exp_name', type=str, default='sac_2L_200Ep')
     args = parser.parse_args()
 
@@ -335,4 +353,7 @@ if __name__ == '__main__':
     sac(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+        start_steps=args.start_steps,
+        replay_size=args.replay_size,
+        without_delay_train=args.without_delay_train,
         logger_kwargs=logger_kwargs)
