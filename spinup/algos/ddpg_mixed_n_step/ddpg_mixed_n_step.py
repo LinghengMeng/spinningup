@@ -131,6 +131,7 @@ def ddpg_mixed_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_
                       lambda_value = 0.8,
                       n_step_start = 1,
                       n_step_end = 5,
+                      rejection_method = 'no_rejection_average_weight',
                           n_step=1,
                           random_n_step=False, random_n_step_low=1, random_n_step_high=5,
                           gamma=0.99, without_delay_train=False, obs_noise_scale=0,
@@ -277,23 +278,64 @@ def ddpg_mixed_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_
 
     # Bellman backup for Q function
     n_step_backup_list = []
+    n_step_backup_weight_list = []
+    n_step_backup_weighted_list = []
     for n_step in range(n_step_start, n_step_end+1):
         print(n_step)
-        if n_step <= n_step_end -1:
-            n_step_weight = (1-lambda_value)*lambda_value**(n_step - n_step_start)
+        if n_step <= n_step_end - 1:
+            n_step_weight = (1 - lambda_value) * lambda_value ** (n_step - n_step_start)
         else:
-            n_step_weight = lambda_value**(n_step_end - n_step_start)
+            n_step_weight = lambda_value ** (n_step_end - n_step_start)
+
         n_step_backup = tf.stop_gradient(tf.reduce_sum(tf.multiply(tf.pow(gamma, tf.range(0, n_step, dtype=tf.float32))
                                                                  * (1 - tf.slice(d_ph, [0, 0], [batch_size, n_step])),
                                                                  tf.slice(r_ph, [0, 0], [batch_size, n_step])), axis=1)
                                        + gamma ** n_step * (1 - tf.reshape(tf.slice(d_ph, [0, n_step], [batch_size, 1]), [-1])) * n_step_q_pi_targ[n_step-n_step_start])
-        n_step_backup_list.append(n_step_weight*n_step_backup)
-    # import pdb;
-    # pdb.set_trace()
+        n_step_backup_list.append(n_step_backup)
+        n_step_backup_weight_list.append(n_step_weight)
+        n_step_backup_weighted_list.append(n_step_weight*n_step_backup)
+
+    # TODO: could we consider standard deviation of n-step bootstrapped Q and reject outliers?
+    #   because for different states the extent of overestimation might be different!
+
+
     # DDPG losses
     # 1. pi loss
     pi_loss = -tf.reduce_mean(q_pi)
-    q_loss = tf.reduce_mean((q - tf.reduce_sum(tf.stack(n_step_backup_list, axis=1), axis=1)) ** 2)
+
+    all_n_step_backup = tf.stack(n_step_backup_list, axis=1)
+
+    if rejection_method == 'no_rejection_average_weight':
+        q_loss = tf.reduce_mean((q - tf.reduce_mean(all_n_step_backup, axis=1)) ** 2)
+    elif rejection_method == 'no_rejection_lambda_weight':
+        q_loss = tf.reduce_mean((q - tf.reduce_sum(tf.stack(n_step_backup_weighted_list, axis=1), axis=1)) ** 2)
+    elif rejection_method == 'mean_and_std_rejection':
+        # 1. Meand and Standard Deviation rejection
+        rejection_deviation_scale = 3
+        all_n_step_backup_std = tf.math.reduce_std(all_n_step_backup, axis=1)
+        all_n_step_backup_mean = tf.math.reduce_mean(all_n_step_backup, axis=1)
+        rejection_upper_bound = tf.reshape(all_n_step_backup_mean + rejection_deviation_scale * all_n_step_backup_std,
+                                 shape=(batch_size, 1))
+        rejection_lower_bound = tf.reshape(all_n_step_backup_mean - rejection_deviation_scale * all_n_step_backup_std,
+                                 shape=(batch_size, 1))
+        # mean-std<= kept values < mean+std
+        kept_mask = tf.dtypes.cast(tf.math.logical_and(tf.math.less(all_n_step_backup, rejection_upper_bound),
+                                                       tf.math.greater(all_n_step_backup, rejection_lower_bound)), tf.float32)
+        mean_backup_after_rejection = tf.reduce_sum(tf.math.multiply(all_n_step_backup, kept_mask), axis=1) / tf.reduce_sum(
+            kept_mask, axis=1)
+        q_loss = tf.reduce_mean((q - mean_backup_after_rejection) ** 2)
+    elif rejection_method == 'interquartile_rejection':
+        # 2. Interquartile rejection
+        reject_low_k = 1
+        reject_top_k = 1
+        n_size = n_step_end - n_step_start + 1
+        after_rejct_top_k = tf.math.top_k(-all_n_step_backup, n_size - reject_top_k)[0]
+        after_rejct_low_k = tf.math.top_k(-after_rejct_top_k, n_size - reject_low_k)[0]
+        q_loss = tf.reduce_mean((q-tf.reduce_mean(after_rejct_low_k, axis=1))**2)
+
+    # import pdb; pdb.set_trace()
+
+    # q_loss = tf.reduce_mean((q - tf.reduce_sum(tf.stack(n_step_backup_weighted_list, axis=1), axis=1)) ** 2)
 
     # Separate train ops for pi, q
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
@@ -328,7 +370,9 @@ def ddpg_mixed_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_
             o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
             while not(d or (ep_len == max_ep_len)):
                 # Take deterministic actions at test time (noise_scale=0)
-                o, r, d, _ = test_env.step(get_action(o, 0))
+                a = get_action(o, 0)
+                # print(a)
+                o, r, d, _ = test_env.step(a)
                 ep_ret += r
                 ep_len += 1
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
@@ -409,7 +453,7 @@ def ddpg_mixed_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_
                          }
             # import pdb; pdb.set_trace()
             # Q-learning update
-            outs = sess.run([q_loss, q, n_step_backup_list, train_q_op], feed_dict)
+            outs = sess.run([q_loss, q, n_step_backup_weighted_list, train_q_op], feed_dict)
             logger.store(LossQ=outs[0], QVals=outs[1])
             logger.store(LossQ=outs[0], QVals=outs[1])
             logger.store(**{'{}Step_Backup'.format(i): outs[2][i-n_step_start] for i in range(n_step_start, n_step_end + 1)})
@@ -437,10 +481,16 @@ def ddpg_mixed_n_step(env_name, ac_kwargs=dict(), seed=0, new_mlp=True, dropout_
                                  r_ph: batch['rews'],
                                  d_ph: batch['done']
                                 }
-
+                    # mean_kept_mask = sess.run(tf.reduce_mean(tf.reduce_sum(kept_mask, axis=1)), feed_dict)
+                    # print('mean_kept_mask={}'.format(mean_kept_mask))
+                    # all_backup = sess.run(all_n_step_backup, feed_dict)
+                    # upper_bound = sess.run(rejection_upper_bound, feed_dict)
+                    # lower_bound = sess.run(rejection_lower_bound, feed_dict)
+                    # # import pdb; pdb.set_trace()
+                    # print('all_backup[0,:]={}, [{},{}] '.format(all_backup[0,:],lower_bound[0], upper_bound[0]))
                     # Q-learning update
                     # Q-learning update
-                    outs = sess.run([q_loss, q, n_step_backup_list, train_q_op], feed_dict)
+                    outs = sess.run([q_loss, q, n_step_backup_weighted_list, train_q_op], feed_dict)
                     logger.store(LossQ=outs[0], QVals=outs[1])
                     logger.store(**{'{}Step_Backup'.format(i): outs[2][i-n_step_start] for i in range(n_step_start, n_step_end+1)})
 
@@ -492,6 +542,10 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_value', type=float, default=0.8)
     parser.add_argument('--n_step_start', type=int, default=1)
     parser.add_argument('--n_step_end', type=int, default=5)
+    parser.add_argument('--rejection_method', type=str,
+                        choices=['no_rejection_average_weight', 'no_rejection_lambda_weight',
+                                 'mean_and_std_rejection', 'interquartile_rejection' ],
+                        default='no_rejection_average_weight')
 
     parser.add_argument('--n_step', type=int, default=5)
     parser.add_argument('--random_n_step', action='store_true')
@@ -534,7 +588,7 @@ if __name__ == '__main__':
                           ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
                       lambda_value=args.lambda_value,
                       n_step_start=args.n_step_start,
-                      n_step_end=args.n_step_end,
+                      n_step_end=args.n_step_end, rejection_method = args.rejection_method,
                           n_step=args.n_step,
                           random_n_step=args.random_n_step,
                           random_n_step_low=args.random_n_step_low, random_n_step_high=args.random_n_step_high,
