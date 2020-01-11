@@ -59,7 +59,7 @@ class ReplayBuffer:
                     rews=self.rews_buf[idxs],
                     done=self.done_buf[idxs])
 
-    def sample_batch_n_step(self, batch_size=32, n_step=1):
+    def sample_batch_n_step(self, batch_size=32, n_step=1, debug=False):
         """
         return training batch for n-step experiences
         :param batch_size:
@@ -96,6 +96,9 @@ class ReplayBuffer:
         for d_i in range(done_index.shape[1]):
             x, y=done_index[:, d_i]
             batch_done[x, y:] = 1
+        if debug:
+            import pdb; pdb.set_trace()
+
         batch_done = np.hstack((np.zeros((batch_size, 1)), batch_done))
         return dict(obs1=batch_obs1[:,0,:],
                     obs2=batch_obs2[:,:,:],
@@ -139,49 +142,125 @@ def pybulletenv_set_state(env, state):
         env.env._p.resetJointState(robot_id, j_i, j_s[0], j_s[1])
     return env
 
+def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
+                         env_name, batch_envs,
+                         replay_buffer, n_step, exp_batch_size=10, exp_n_step=0):
+    """
+    This function is used to expand policy on environment to get ground true value for Q.
+    :param sess:
+    :param q:
+    :param x_ph:
+    :param a_ph:
+    :param replay_buffer:
+    :param exp_batch_size:
+    :param exp_n_step:
+    :return:
+    """
+    exp_batch = replay_buffer.sample_batch_n_step(exp_batch_size, n_step=n_step)
+    # restore to state after exp_n_step step, then expand until termination.
+    restore_obs_sim = pd.DataFrame(exp_batch['obs2_sim_state']).iloc[:, exp_n_step].tolist()
 
-def env_expansion_process(actor_weights, env_name, restore_obs, restore_obs_sim, done, gamma):
-    import tensorflow as tf
-    env = gym.make(env_name)
-    obs_dim = env.observation_space.shape[0]
-    act_dim = env.action_space.shape[0]
-    act_limit = env.action_space.high[0]
+    exp_outs = []
+    for exp_b_i in range(exp_batch_size):
+        # restore simulator state
+        _ = batch_envs[exp_b_i].reset()
+        if 'PyBulletEnv' in env_name:
+            pybulletenv_set_state(batch_envs[exp_b_i], restore_obs_sim[exp_b_i])
+        elif 'Roboschool' in env_name:
+            print('Roboschool is used.')
+        else:
+            batch_envs[exp_b_i].sim.set_state(restore_obs_sim[exp_b_i])  # MuJuco
 
-    config = tf.ConfigProto(
-        device_count={'GPU': 0}
-    )
-    sess = tf.Session(config=config)
-    tf.keras.backend.set_session(sess)
+        # expand until termination
+        exp_o2 = exp_batch['obs2'][exp_b_i, exp_n_step, :].copy()    # np.copy() to copy array, otherwise copy reference
+        exp_done = exp_batch['done'][exp_b_i, exp_n_step + 1].copy()
+        exp_dis_r = 0
+        step = 0
+        while not exp_done:
+            exp_o2, exp_r, exp_done, _ = batch_envs[exp_b_i].step(
+                sess.run(pi, feed_dict={x_ph: exp_o2.reshape(1, -1)})[0])
+            exp_dis_r += (gamma ** step) * exp_r
+            step += 1
+        exp_outs.append(exp_dis_r)
+    # Online expansion
+    # expand based on current policy until termination, after first exp_n_step
+    dis_acc_rew = np.asarray(exp_outs)
+    # exp_n_step from replay buffer
+    dis_r_n_step = np.tile(np.asarray([gamma ** i for i in range(exp_n_step + 1)]).reshape([1, -1]),
+                           [exp_batch_size, 1])
+    dis_acc_n_step = np.sum(np.multiply(dis_r_n_step, exp_batch['rews'][:, :exp_n_step+1].reshape([exp_batch_size, -1])),
+                            axis=1)
+    ground_truth_q = dis_acc_n_step + gamma ** (exp_n_step + 1) * dis_acc_rew
+    # Prediction
+    predicted_q = sess.run(q, feed_dict={x_ph: exp_batch['obs1'], a_ph: exp_batch['acts']})
+    return ground_truth_q, predicted_q
 
-    # Create policy
-    x_ph = tf.placeholder(dtype=tf.float32, shape=(None, obs_dim))
-    hidden_sizes = [300, 300]
-    actor_hidden_activation = tf.keras.activations.relu
-    actor_output_activation = tf.keras.activations.tanh
-    actor = MLP(layer_sizes=hidden_sizes + [act_dim],
-                hidden_activation=actor_hidden_activation, output_activation=actor_output_activation)
-    pi = act_limit * actor(x_ph)
-    # Load policy weights
-    actor.set_weights(actor_weights)
 
-    env.reset()
-    # restore simulator state
-    if 'PyBulletEnv' in env_name:
-        pybulletenv_set_state(env, restore_obs_sim)
-    elif 'Roboschool' in env_name:
-        print('Roboschool is used.')
-    else:
-        env.sim.set_state(restore_obs_sim)  # MuJuco
+def online_expand_first_n_step(sess, pi, q_pi_x_targ,
+                               backups, dis_acc_first, dis_acc_following, dis_boots,
+                               x_ph, x2_ph, r_ph, d_ph, batch_size_ph,
+                               gamma,
+                               env_name, batch_envs,
+                               replay_buffer, n_step, exp_batch_size=10):
+    # Sample mini-batch
+    exp_batch = replay_buffer.sample_batch_n_step(exp_batch_size, n_step=n_step)
+    # create matrix to record n-step experiences where the first step is restored from past experience
+    exp_rew = np.zeros(exp_batch['rews'].shape)
+    exp_next_obs = np.zeros(exp_batch['obs2'].shape)
+    exp_done = np.zeros(exp_batch['done'].shape)
+    exp_next_obs[:, 0, :] = exp_batch['obs2'][:, 0, :]
+    exp_rew[:, 0] = exp_batch['rews'][:, 0]
+    exp_done[:, 0:2] = exp_batch['done'][:, 0:2]
 
-    # expand
-    o2 = restore_obs
-    exp_dis_r = 0
-    step = 0
-    while not done:
-        o2, r, done, _ = env.step(sess.run(pi, feed_dict={x_ph:o2.reshape(1,-1)})[0])
-        exp_dis_r += (gamma**step)*r
-        step += 1
-    return exp_dis_r
+    # Prepare restore states
+    restore_obs_sim = pd.DataFrame(exp_batch['obs2_sim_state']).iloc[:, 0].tolist()
+    for exp_b_i in range(exp_batch_size):
+        # restore simulator state
+        _ = batch_envs[exp_b_i].reset()
+        if 'PyBulletEnv' in env_name:
+            pybulletenv_set_state(batch_envs[exp_b_i], restore_obs_sim[exp_b_i])
+        elif 'Roboschool' in env_name:
+            print('Roboschool is used.')
+        else:
+            batch_envs[exp_b_i].sim.set_state(restore_obs_sim[exp_b_i])  # MuJuco
+        # expand n-1 steps following 1st step
+        o2 = exp_batch['obs2'][exp_b_i, 0, :].copy()
+        done = exp_done[exp_b_i, 1].copy() # the 1st done is only used to calculate accumulated reward
+
+        for s_i in range(n_step-1): # the following n-1 steps
+            if done:
+                break
+            else:
+                o2, r, done, _ = batch_envs[exp_b_i].step(
+                    sess.run(pi, feed_dict={x_ph: o2.reshape(1, -1)})[0])
+                exp_next_obs[exp_b_i, 1+s_i, :] = o2
+                exp_rew[exp_b_i, 1+s_i] = r
+                exp_done[exp_b_i, 2+s_i] = done
+                # print('exp_b_i={}, s_i= {}, done={}'.format(exp_b_i, s_i, done))
+
+    # set elements after first done=1 to 1
+    done_index = np.asarray(np.where(exp_done == 1))
+    for d_i in range(done_index.shape[1]):
+        x, y = done_index[:, d_i]
+        exp_done[x, y:] = 1
+
+    # 1st step + (n-1) step online expansion + bootstrapping
+    exp_backup, exp_first, exp_second, exp_third = sess.run([backups[n_step - 1], dis_acc_first[n_step - 1],
+                                                             dis_acc_following[n_step - 1], dis_boots[n_step - 1]],
+                                                            feed_dict={x2_ph: exp_next_obs,
+                                                                       r_ph: exp_rew,
+                                                                       d_ph: exp_done,
+                                                                       batch_size_ph: exp_batch_size})
+    # 1st step + (n-1) step offline expansion + bootstrapping
+    n_s_backup, n_s_first, n_s_second, n_s_third = sess.run([backups[n_step - 1], dis_acc_first[n_step - 1],
+                                                             dis_acc_following[n_step - 1], dis_boots[n_step - 1]],
+                                                            feed_dict={x2_ph: exp_batch['obs2'],
+                                                                       r_ph: exp_batch['rews'],
+                                                                       d_ph: exp_batch['done'],
+                                                                       batch_size_ph: exp_batch_size})
+
+    return exp_backup, exp_first, exp_second, exp_third, \
+           n_s_backup, n_s_first, n_s_second, n_s_third
 
 """
 
@@ -293,6 +372,7 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
     r_ph = tf.placeholder(dtype=tf.float32, shape=(None, None))
     d_ph = tf.placeholder(dtype=tf.float32, shape=(None, None))
     n_step_ph = tf.placeholder(dtype=tf.float32, shape=())
+    batch_size_ph = tf.placeholder(dtype=tf.int32)
 
     hidden_sizes = list(ac_kwargs['hidden_sizes'])
     actor_hidden_activation = tf.keras.activations.relu
@@ -318,24 +398,44 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
                          hidden_activation=actor_hidden_activation, output_activation=actor_output_activation)
         critic_targ = MLP(layer_sizes=hidden_sizes + [1],
                           hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
+        pi_x_targ = act_limit * actor_targ(x_ph)
+        q_pi_x_targ = tf.squeeze(critic_targ(tf.concat([x_ph, pi_x_targ], axis=-1)), axis=1)
+
         n_step_bootstrapped_q = []
         for n_step_i in range(n_step):
-            next_obs_tmp = tf.reshape(tf.slice(x2_ph, [0, n_step_i, 0], [batch_size, 1, obs_dim]), [batch_size, obs_dim])
+            # slice next_obs for different n
+            next_obs_tmp = tf.reshape(tf.slice(x2_ph, [0, n_step_i, 0], [batch_size_ph, 1, obs_dim]), [batch_size_ph, obs_dim])
             pi_targ_tmp = act_limit * actor_targ(next_obs_tmp)
             q_pi_targ = tf.squeeze(critic_targ(tf.concat([next_obs_tmp, pi_targ_tmp], axis=-1)), axis=1)
             n_step_bootstrapped_q.append(q_pi_targ)
+
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
 
     # Bellman backup for Q function
+    dis_acc_first = []
+    dis_acc_following = []
+    dis_boots = []
     backups = []
     for n_step_i in range(1, n_step+1):
-        backup_tmp = tf.stop_gradient(
-            tf.reduce_sum(tf.multiply(tf.pow(gamma, tf.range(0, n_step_i, dtype=tf.float32))
-                                      * (1 - tf.slice(d_ph, [0, 0], [batch_size, n_step_i])),
-                                      tf.slice(r_ph, [0, 0], [batch_size, n_step_i])), axis=1)
-            + gamma ** n_step_i * (1 - tf.reshape(tf.slice(d_ph, [0, n_step_i], [batch_size, 1]), [-1])) *
-            n_step_bootstrapped_q[n_step_i - 1])
+        # for k = 0,..., n-1: (1-done) * gamma**(k) * reward
+        dis_rate = tf.tile(tf.reshape(tf.pow(gamma, tf.range(0, n_step_i, dtype=tf.float32)), [1,-1]), [batch_size_ph, 1])
+        dis_rate = tf.multiply(dis_rate, 1 - tf.slice(d_ph, [0, 0], [batch_size_ph, n_step_i])) # multiply done slice
+        n_step_dis_rew = tf.multiply(dis_rate, tf.slice(r_ph, [0, 0], [batch_size_ph, n_step_i]))
+        # first step reward
+        n_step_first_rew = n_step_dis_rew[:, 0]
+        # discounted following step reward
+        n_step_following_rew = n_step_dis_rew[:, 1:]
+        n_step_offline_acc_rew = tf.reduce_sum(n_step_dis_rew, axis=1)
+        # discounted bootstrapped reward
+        boots_q = gamma ** n_step_i * (1 - tf.reshape(tf.slice(d_ph, [0, n_step_i], [batch_size_ph, 1]), [-1])) * \
+        n_step_bootstrapped_q[n_step_i - 1]
+        # whole n-step backup
+        backup_tmp = tf.stop_gradient(n_step_first_rew + n_step_offline_acc_rew + boots_q)
+        # Separately save for logging
+        dis_acc_first.append(n_step_first_rew)
+        dis_acc_following.append(n_step_offline_acc_rew)
+        dis_boots.append(boots_q)
         backups.append(backup_tmp)
 
     # backup_n_step = backups[-1]
@@ -344,6 +444,8 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
 
     if backup_method == 'avg_n_step':
         backup_n_step = backup_avg_n_step
+    elif backup_method == 'min_n_step':
+        backup_n_step = backup_min_n_step
     elif backup_method == '1_step':
         backup_n_step = backups[0]
     elif backup_method == '2_step':
@@ -354,8 +456,6 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
         backup_n_step = backups[3]
     elif backup_method == '5_step':
         backup_n_step = backups[4]
-    elif backup_method == 'min_n_step':
-        backup_n_step = backup_min_n_step
     else:
         pass
 
@@ -407,7 +507,8 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
-    batch_env_reset = [batch_env.reset() for batch_env in batch_envs]
+    for b_env in batch_envs:
+        _ = b_env.reset()
     old_ep_ret = 0
     max_ep_ret = 0
     ep_ret_history = deque(maxlen=5)
@@ -462,7 +563,8 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
                          a_ph: batch['acts'],
                          r_ph: batch['rews'],
                          d_ph: batch['done'],
-                         n_step_ph: n_step
+                         n_step_ph: n_step,
+                         batch_size_ph:batch_size
                          }
 
             # Q-learning update
@@ -490,115 +592,46 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
                                  a_ph: batch['acts'],
                                  r_ph: batch['rews'],
                                  d_ph: batch['done'],
-                                 n_step_ph: n_step}
-
-
-                    """
-                    ###############################################
-                    """
-                    start_time_on_policy = time.time()
-
-
-
-
-                    # reset simulator to the state (s') after taking (s, a, r)
-                    # for i, batch_env_i in enumerate(batch_envs):
-                    #     if 'PyBulletEnv' in env_name:
-                    #         pybulletenv_set_state(batch_env_i, restore_obs_sim[i])
-                    #     elif 'Roboschool' in env_name:
-                    #         print('Roboschool is used.')
-                    #     else:
-                    #         batch_env_i.sim.set_state(restore_obs_sim[i])  # MuJuco
-
-                    # # n-step online expansion + bootstrapped value
-                    # n_step_next_obs = np.zeros([batch_size, n_step, obs_dim])
-                    # obs_restore = batch['batch_obs_restore']
-                    # n_step_batch_r = batch['rews'][:,0]
-                    # n_step_batch_d = batch['done'][:,0:2]
-                    #
-                    # # Todo: expand until the end of an episod
-                    # # for i in range(1000):
-                    #
-                    #
-                    # for step_i in range(1, n_step):
-                    #     n_step_next_obs[:, step_i-1, :] = obs_restore
-                    #     action = sess.run(pi, feed_dict={x_ph:obs_restore})
-                    #     obs_resotre_next = []
-                    #     batch_r = []
-                    #     batch_d = []
-                    #     for i, batch_env_i in enumerate(batch_envs):
-                    #         tmp_o2, tmp_r, tmp_d, _ = batch_env_i.step(action[i])
-                    #         obs_resotre_next.append(tmp_o2)
-                    #         batch_r.append(tmp_r)
-                    #         batch_d.append(tmp_d)
-                    #         if tmp_d:
-                    #             tmp_o2 = batch_env_i.reset()
-                    #             obs_resotre_next[-1] = tmp_o2
-                    #     obs_restore = np.asarray(obs_resotre_next)
-                    #     n_step_batch_r = np.append(n_step_batch_r, batch_r)
-                    #     n_step_batch_d = np.append(n_step_batch_d, batch_d)
-                    #
-                    # n_step_batch_r = np.reshape(n_step_batch_r, (batch_size, n_step), order='F')
-                    # n_step_batch_d = np.reshape(n_step_batch_d, (batch_size, n_step+1), order='F')
-                    # n_step_next_obs[:, - 1, :] = obs_restore
-                    #
-                    # # Set all done after the fist met one to 1
-                    # batch_done_index = np.asarray(np.where(n_step_batch_d == 1))
-                    # for d_i in range(batch_done_index.shape[1]):
-                    #     x, y = batch_done_index[:, d_i]
-                    #     n_step_batch_d[x, y:] = 1
-                    #
-                    # bootstrapped_q = sess.run(n_step_bootstrapped_q, feed_dict={x2_ph: n_step_next_obs})
-                    # bootstrapped_q = np.stack(bootstrapped_q, axis=1)
-                    #
-                    # n_step_backup_on_policy = np.zeros((batch_size, n_step))
-                    # reward_discounted = np.zeros((batch_size, n_step))
-                    # for n_i in range(n_step):
-                    #     discount_n_i = gamma**n_i
-                    #     reward_discounted[:, n_i] = discount_n_i * (1-n_step_batch_d[:, n_i]) * n_step_batch_r[:, n_i]
-                    #     bootstrapped_n_i_discounted = gamma ** (n_i+1) * (1-n_step_batch_d[:, n_i+1]) * bootstrapped_q[:, n_i]
-                    #     n_step_backup_on_policy[:, n_i] = np.sum(reward_discounted[:, :(n_i+1)], axis=1) + bootstrapped_n_i_discounted
-                    #
-                    # logger.store(**{'QBackupOnPolicy{}Step'.format(n_step_i+1):n_step_backup_on_policy[:,n_step_i] for n_step_i in range(n_step)})
-                    # logger.store(QBackupOnPolicyMixedNStep=np.mean(n_step_backup_on_policy, axis=1))
-
-                    """
-                    ###############################################
-                    """
-                    # Q-learning update
+                                 n_step_ph: n_step,
+                                 batch_size_ph: batch_size}
+                    # critic update
                     outs = sess.run([q_loss, q, backups, backup_avg_n_step, backup_min_n_step, train_q_op], feed_dict)
                     logger.store(LossQ=outs[0], QVals=outs[1])
                     logger.store(
                         **{'QBackup{}Step'.format(n_step_i+1): outs[2][n_step_i] for n_step_i in range(n_step)})
                     logger.store(QBackupAvgNStep=outs[3], QBackupMinNStep=outs[4])
-
+                    # actor update
                     outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
                     logger.store(LossPi=outs[0])
-
-            # n-step offline + online expansion
-            exp_batch_size = 50
-            exp_batch = replay_buffer.sample_batch_n_step(exp_batch_size, n_step=n_step)
-            exp_n_step = 0
-            restore_obs = exp_batch['obs2'][:, exp_n_step, :]
-            restore_obs_sim = pd.DataFrame(exp_batch['obs2_sim_state']).iloc[:, exp_n_step].tolist()
-            restore_act = exp_batch['acts']
-            done = exp_batch['done'][:, exp_n_step + 1]
-
-            actor_weights = actor.get_weights()
-            arguments = [(actor_weights, env_name, restore_obs[b_i], restore_obs_sim[b_i], done[b_i], gamma) for
-                         b_i in range(exp_batch_size)]
-
-            # multiprocessing.cpu_count()
-            pool = Pool(processes=3)
-            process_outs = pool.starmap(env_expansion_process, arguments)
-
-            discounted_accumulated_reward = np.asarray(process_outs)
-            dis_r = np.tile(np.asarray([gamma ** i for i in range(exp_n_step + 1)]).reshape([1, -1]),
-                            [exp_batch_size, 1])
-            ground_truth_q = dis_r * exp_batch['rews'][:, exp_n_step].reshape([exp_batch_size, -1]) + gamma ** (
-                        exp_n_step + 1) * discounted_accumulated_reward
-            predicted_q = sess.run(q, feed_dict={x_ph: exp_batch['obs1'], a_ph: exp_batch['acts']})
+            """
+            ###############################################
+            """
+            # Logging: n-step offline + online expansion
+            exp_batch_size = 10   # size of examined batch
+            exp_after_n_step = 0  # indicates expand based on online policy after observing exp_n_step offline experiences
+            ground_truth_q, predicted_q = online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
+                                                               env_name, batch_envs,
+                                                               replay_buffer, n_step, exp_batch_size, exp_after_n_step)
             logger.store(PredictedQ=predicted_q, GroundTruthQ=ground_truth_q)
+
+            # Logging: n-step online expansion + bootstrapped Q thereafter
+            exp_batch_size = 10
+            exp_backup, exp_first, exp_second, exp_third, \
+            n_s_backup, n_s_first, n_s_second, n_s_third = online_expand_first_n_step(sess, pi, q_pi_x_targ,
+                                                                                     backups, dis_acc_first, dis_acc_following, dis_boots,
+                                                                                     x_ph, x2_ph, r_ph, d_ph, batch_size_ph,
+                                                                                     gamma, env_name, batch_envs,
+                                                                                     replay_buffer, n_step, exp_batch_size)
+
+            logger.store(NStepOfflineBackup=n_s_backup, NStepOfflineFir=n_s_first,
+                         NStepOfflineSec=n_s_second, NStepOfflineThi=n_s_third,
+                         NStepOnlineBackup=exp_backup, NStepOnlineFir=exp_first,
+                         NStepOnlineSec=exp_second, NStepOnlineThi=exp_third)
+            """
+            ###############################################
+            """
+            # import pdb;
+            # pdb.set_trace()
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -607,9 +640,13 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
         if t > 0 and t % steps_per_epoch == 0:
             epoch = t // steps_per_epoch
 
-            # # Save model
-            # if (epoch % save_freq == 0) or (epoch == epochs-1):
-            #     logger.save_state({'env': env}, None)
+            # Save actor-critic model
+            if (epoch % save_freq == 0) or (epoch == epochs-1):
+                model_save_dir = os.path.join(logger.output_dir, 'checkpoints')
+                if not os.path.exists(model_save_dir):
+                    os.makedirs(model_save_dir)
+                actor.save_weights(os.path.join(model_save_dir, 'epoch{}_actor'.format(epoch)))
+                critic.save_weights(os.path.join(model_save_dir, 'epoch{}_critic'.format(epoch)))
 
             # Test the performance of the deterministic version of the agent.
             test_agent()
@@ -631,6 +668,14 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
             logger.log_tabular('QBackupMinNStep', with_min_and_max=True)
             logger.log_tabular('PredictedQ', with_min_and_max=True)
             logger.log_tabular('GroundTruthQ', with_min_and_max=True)
+            logger.log_tabular('NStepOfflineBackup', with_min_and_max=True)
+            logger.log_tabular('NStepOnlineBackup', with_min_and_max=True)
+            logger.log_tabular('NStepOfflineFir', with_min_and_max=True)
+            logger.log_tabular('NStepOnlineFir', with_min_and_max=True)
+            logger.log_tabular('NStepOfflineSec', with_min_and_max=True)
+            logger.log_tabular('NStepOnlineSec', with_min_and_max=True)
+            logger.log_tabular('NStepOfflineThi', with_min_and_max=True)
+            logger.log_tabular('NStepOnlineThi', with_min_and_max=True)
             logger.log_tabular('Time', time.time()-start_time)
             logger.dump_tabular()
 
@@ -642,8 +687,9 @@ if __name__ == '__main__':
     parser.add_argument('--hid', type=int, default=300)
     parser.add_argument('--l', type=int, default=2)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--seed', '-s', type=int, default=3)
+    parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--save_freq', type=int, default=10)
     parser.add_argument('--steps_per_epoch', type=int, default=5000)
     parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--n_step', type=int, default=5)
@@ -682,7 +728,7 @@ if __name__ == '__main__':
                     gamma=args.gamma, seed=args.seed,replay_size=args.replay_size,
                     n_step=args.n_step, backup_method=args.backup_method,
                     without_delay_train=args.without_delay_train,
-                    epochs=args.epochs,
+                    epochs=args.epochs, save_freq=args.save_freq,
                     batch_size=args.batch_size,
                     steps_per_epoch=args.steps_per_epoch, start_steps=args.start_steps,
                     logger_kwargs=logger_kwargs)
