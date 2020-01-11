@@ -14,10 +14,10 @@ import os.path as osp
 import multiprocessing
 from multiprocessing import Process, Pool
 
-import tkinter as tk
-from tkinter import simpledialog
-ROOT = tk.Tk()
-ROOT.withdraw()
+# import tkinter as tk
+# from tkinter import simpledialog
+# ROOT = tk.Tk()
+# ROOT.withdraw()
 
 from collections import deque
 
@@ -456,7 +456,7 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
             backup_n_step = backups[tmp_step-1]
         else:
             raise Exception('Wrong backup_method!')
-    
+
     # DDPG losses
     pi_loss = -tf.reduce_mean(q_pi)
     q_loss = tf.reduce_mean((q-backup_n_step)**2)
