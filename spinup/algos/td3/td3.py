@@ -1,11 +1,12 @@
+import os
 import numpy as np
 import tensorflow as tf
 import gym
-import roboschool
+# import roboschool
 import pybulletgym
 import time
 from spinup.algos.td3 import core
-from spinup.algos.td3.core import get_vars
+from spinup.algos.td3.core import MLP
 from spinup.utils.logx import EpochLogger
 import os.path as osp
 
@@ -44,7 +45,9 @@ class ReplayBuffer:
 TD3 (Twin Delayed DDPG)
 
 """
-def td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0, 
+def td3(env_name, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(),
+        actor_hidden_layers=[300, 300], critic_hidden_layers=[300, 300],
+        reward_scale = 1, seed=0,
         steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, 
         polyak=0.995, pi_lr=1e-3, q_lr=1e-3,
         without_start_steps=True, batch_size=100, start_steps=10000,
@@ -137,29 +140,42 @@ def td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
     tf.set_random_seed(seed)
     np.random.seed(seed)
 
-    env, test_env = env_fn(), env_fn()
+    env, test_env = gym.make(env_name), gym.make(env_name)
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.shape[0]
 
     # Action limit for clamping: critically, assumes all dimensions share the same bound!
     act_limit = env.action_space.high[0]
 
-    # Share information about action space with policy architecture
-    ac_kwargs['action_space'] = env.action_space
-
     # Inputs to computation graph
     x_ph, a_ph, x2_ph, r_ph, d_ph = core.placeholders(obs_dim, act_dim, obs_dim, None, None)
 
+    actor_hidden_sizes = actor_hidden_layers
+    critic_hidden_sizes = critic_hidden_layers
+    actor_hidden_activation = tf.keras.activations.relu
+    actor_output_activation = tf.keras.activations.tanh
+    critic_hidden_activation = tf.keras.activations.relu
+    critic_output_activation = tf.keras.activations.linear
+
     # Main outputs from computation graph
     with tf.variable_scope('main'):
-        pi, q1, q2, q1_pi = actor_critic(x_ph, a_ph, **ac_kwargs)
+        actor = MLP(layer_sizes=actor_hidden_sizes + [act_dim],
+                    hidden_activation=actor_hidden_activation, output_activation=actor_output_activation)
+        critic1 = MLP(layer_sizes=critic_hidden_sizes + [1],
+                      hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
+        critic2 = MLP(layer_sizes=critic_hidden_sizes + [1],
+                      hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
+        pi = act_limit * actor(x_ph)
+        q1 = tf.squeeze(critic1(tf.concat([x_ph, a_ph], axis=-1)), axis=1)
+        q1_pi = tf.squeeze(critic1(tf.concat([x_ph, pi], axis=-1)), axis=1)
+        q2 = tf.squeeze(critic2(tf.concat([x_ph, a_ph], axis=-1)), axis=1)
+        q2_pi = tf.squeeze(critic2(tf.concat([x_ph, pi], axis=-1)), axis=1)
     
     # Target policy network
     with tf.variable_scope('target'):
-        pi_targ, _, _, _  = actor_critic(x2_ph, a_ph, **ac_kwargs)
-    
-    # Target Q networks
-    with tf.variable_scope('target', reuse=True):
+        actor_targ = MLP(layer_sizes=actor_hidden_sizes + [act_dim],
+                         hidden_activation=actor_hidden_activation, output_activation=actor_output_activation)
+        pi_targ = act_limit * actor_targ(x2_ph)
         if without_target_policy_smoothing:
             a2 = pi_targ
         else:
@@ -169,46 +185,49 @@ def td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             a2 = pi_targ + epsilon
             a2 = tf.clip_by_value(a2, -act_limit, act_limit)
 
+        critic1_targ = MLP(layer_sizes=critic_hidden_sizes + [1],
+                           hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
+        critic2_targ = MLP(layer_sizes=critic_hidden_sizes + [1],
+                           hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
         # Target Q-values, using action from target policy
-        _, q1_targ, q2_targ, _ = actor_critic(x2_ph, a2, **ac_kwargs)
+        q1_targ = tf.squeeze(critic1_targ(tf.concat([x2_ph, a2], axis=-1)), axis=1)
+        q2_targ = tf.squeeze(critic2_targ(tf.concat([x2_ph, a2], axis=-1)), axis=1)
+
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
 
-    # Count variables
-    var_counts = tuple(core.count_vars(scope) for scope in ['main/pi', 'main/q1', 'main/q2', 'main'])
-    print('\nNumber of parameters: \t pi: %d, \t q1: %d, \t q2: %d, \t total: %d\n'%var_counts)
-
     # Bellman backup for Q functions, using Clipped Double-Q targets
+    # TD3 losses
     min_q_targ = tf.minimum(q1_targ, q2_targ)
     backup = tf.stop_gradient(r_ph + gamma*(1-d_ph)*min_q_targ)
 
-    # TD3 losses
+    # MSE
+    q1_loss = 0.5 * tf.reduce_mean((backup-q1) ** 2)
+    q2_loss = 0.5 * tf.reduce_mean((backup-q2) ** 2)
     pi_loss = -tf.reduce_mean(q1_pi)
-    q1_loss = tf.reduce_mean((q1-backup)**2)
-    q2_loss = tf.reduce_mean((q2-backup)**2)
     q_loss = q1_loss + q2_loss
 
     # Separate train ops for pi, q
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
     q_optimizer = tf.train.AdamOptimizer(learning_rate=q_lr)
-    train_pi_op = pi_optimizer.minimize(pi_loss, var_list=get_vars('main/pi'))
-    train_q_op = q_optimizer.minimize(q_loss, var_list=get_vars('main/q'))
-
+    train_pi_op = pi_optimizer.minimize(pi_loss, var_list=actor.variables)
+    train_q_op = q_optimizer.minimize(q_loss, var_list=critic1.variables+critic2.variables)
     # Polyak averaging for target variables
     target_update = tf.group([tf.assign(v_targ, polyak*v_targ + (1-polyak)*v_main)
-                              for v_main, v_targ in zip(get_vars('main'), get_vars('target'))])
-
+                              for v_main, v_targ in zip(actor.variables + critic1.variables + critic2.variables,
+                                                        actor_targ.variables + critic1_targ.variables + critic2_targ.variables)])
     # Initializing targets to match main variables
     target_init = tf.group([tf.assign(v_targ, v_main)
-                              for v_main, v_targ in zip(get_vars('main'), get_vars('target'))])
+                              for v_main, v_targ in zip(actor.variables + critic1.variables + critic2.variables,
+                                                        actor_targ.variables + critic1_targ.variables + critic2_targ.variables)])
 
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
     sess.run(target_init)
 
     # Setup model saving
-    logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q1': q1, 'q2': q2})
+    # logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q1': q1, 'q2': q2})
 
     def get_action(o, noise_scale):
         a = sess.run(pi, feed_dict={x_ph: o.reshape(1,-1)})[0]
@@ -253,7 +272,7 @@ def td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        replay_buffer.store(o, a, r, o2, d)
+        replay_buffer.store(o, a, reward_scale*r, o2, d)
 
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
@@ -307,8 +326,14 @@ def td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
             epoch = t // steps_per_epoch
 
             # Save model
-            if (epoch % save_freq == 0) or (epoch == epochs-1):
-                logger.save_state({'env': env}, None)
+            # Save actor-critic model
+            if (epoch % save_freq == 0) or (epoch == epochs - 1):
+                model_save_dir = os.path.join(logger.output_dir, 'checkpoints')
+                if not os.path.exists(model_save_dir):
+                    os.makedirs(model_save_dir)
+                actor.save_weights(os.path.join(model_save_dir, 'epoch{}_actor'.format(epoch)))
+                critic1.save_weights(os.path.join(model_save_dir, 'epoch{}_critic1'.format(epoch)))
+                critic2.save_weights(os.path.join(model_save_dir, 'epoch{}_critic2'.format(epoch)))
 
             # Test the performance of the deterministic version of the agent.
             test_agent()
@@ -331,16 +356,18 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
-    parser.add_argument('--hid', type=int, default=300)
-    parser.add_argument('--l', type=int, default=2)
+    parser.add_argument('--actor_hidden_layers', nargs='+', type=int, default=[300, 300])
+    parser.add_argument('--critic_hidden_layers', nargs='+', type=int, default=[300, 300])
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--seed', '-s', type=int, default=3)
+    parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--save_freq', type=int, default=10)
     parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--replay_size', type=int, default=int(1e6))
     parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--without_target_policy_smoothing', action='store_true')
-    parser.add_argument('--exp_name', type=str, default='td3_one_layer')
+    parser.add_argument('--exp_name', type=str, default='td3')
+    parser.add_argument('--reward_scale', type=float, default=1)
     parser.add_argument('--act_noise', type=float, default=0.1)
     parser.add_argument("--data_dir", type=str, default='spinup_data')
     args = parser.parse_args()
@@ -352,15 +379,13 @@ if __name__ == '__main__':
                         args.data_dir)
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
     
-    td3(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
-        ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
+    td3(env_name=args.env,
+        actor_hidden_layers=args.actor_hidden_layers, critic_hidden_layers=args.critic_hidden_layers,
+        reward_scale=args.reward_scale,
         start_steps=args.start_steps,
         replay_size=args.replay_size,
         without_delay_train=args.without_delay_train,
         without_target_policy_smoothing=args.without_target_policy_smoothing,
-        gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+        gamma=args.gamma, seed=args.seed, epochs=args.epochs, save_freq=args.save_freq,
         act_noise=args.act_noise,
         logger_kwargs=logger_kwargs)
-
-# python ./spinup/algos/td3/td3.py --env HalfCheetah-v2 --seed 3 --l 2 --exp_name td3_two_layers
-# python ./spinup/algos/td3/td3.py --env Ant-v2 --seed 3 --l 2 --exp_name td3_Ant_v2_two_layers

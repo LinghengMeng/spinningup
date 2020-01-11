@@ -35,4 +35,43 @@ def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu,
         q2 = tf.squeeze(mlp(tf.concat([x,a], axis=-1), list(hidden_sizes)+[1], activation, None), axis=1)
     with tf.variable_scope('q1', reuse=True):
         q1_pi = tf.squeeze(mlp(tf.concat([x,pi], axis=-1), list(hidden_sizes)+[1], activation, None), axis=1)
-    return pi, q1, q2, q1_pi
+    with tf.variable_scope('q2', reuse=True):
+        q2_pi = tf.squeeze(mlp(tf.concat([x,pi], axis=-1), list(hidden_sizes)+[1], activation, None), axis=1)
+    return pi, q1, q2, q1_pi, q2_pi
+
+class MLP(tf.keras.Model):
+    def __init__(self, layer_sizes=[32],
+                 hidden_activation=tf.keras.activations.relu, output_activation=tf.keras.activations.linear):
+        super(MLP, self).__init__()
+        self.layers_list = []
+
+        for h_size in layer_sizes[:-1]:
+            self.layers_list.append(tf.keras.layers.Dense(h_size, activation=hidden_activation))
+
+        self.layers_list.append(tf.keras.layers.Dense(layer_sizes[-1], activation=output_activation))
+
+    def call(self, inputs, training=None, mask=None):
+        x = inputs
+        for layer in self.layers_list:
+            x = layer(x)
+        return x
+
+
+class SkipConnectionMLP(tf.keras.Model):
+    def __init__(self, layer_sizes=[32],
+                 hidden_activation=tf.keras.activations.relu, output_activation=tf.keras.activations.linear):
+        super(SkipConnectionMLP, self).__init__()
+        self.layers_list = []
+
+        for h_size in layer_sizes[:-1]:
+            self.layers_list.append(tf.keras.layers.Dense(h_size, activation=hidden_activation))
+
+        self.layers_list.append(tf.keras.layers.Dense(layer_sizes[-1], activation=output_activation))
+
+    def call(self, inputs, training=None, mask=None):
+        x = inputs
+        for l_i, layer in enumerate(self.layers_list):
+            if l_i == 1:
+                x = tf.concat([x, inputs], axis=1)
+            x = layer(x)
+        return x
