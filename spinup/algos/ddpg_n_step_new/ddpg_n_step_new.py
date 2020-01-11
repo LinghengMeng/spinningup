@@ -269,7 +269,7 @@ Deep Deterministic Policy Gradient (DDPG)
 """
 def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
                     steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99,
-                    n_step=1, backup_method='mixed_n_step',
+                    n_step=1, backup_method='mixed_n_step', exp_batch_size=10,
                     without_delay_train=False,
                     polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000,
                     act_noise=0.1, policy_delay=2, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
@@ -441,24 +441,22 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
     # backup_n_step = backups[-1]
     backup_avg_n_step = tf.stop_gradient(tf.reduce_mean(tf.stack(backups, axis=1), axis=1))
     backup_min_n_step = tf.stop_gradient(tf.reduce_min(tf.stack(backups, axis=1), axis=1))
+    backup_avg_n_step_exclude_1 = tf.stop_gradient(tf.reduce_mean(tf.stack(backups[1:], axis=1), axis=1))
 
     if backup_method == 'avg_n_step':
         backup_n_step = backup_avg_n_step
     elif backup_method == 'min_n_step':
         backup_n_step = backup_min_n_step
-    elif backup_method == '1_step':
-        backup_n_step = backups[0]
-    elif backup_method == '2_step':
-        backup_n_step = backups[1]
-    elif backup_method == '3_step':
-        backup_n_step = backups[2]
-    elif backup_method == '4_step':
-        backup_n_step = backups[3]
-    elif backup_method == '5_step':
-        backup_n_step = backups[4]
+    elif backup_method == 'avg_n_step_exclude_1':
+        backup_n_step = backup_avg_n_step_exclude_1
     else:
-        pass
-
+        tmp_step, _ = backup_method.split('_')
+        tmp_step = int(tmp_step)
+        if 1 <= tmp_step and tmp_step <= n_step:
+            backup_n_step = backups[tmp_step-1]
+        else:
+            raise Exception('Wrong backup_method!')
+    
     # DDPG losses
     pi_loss = -tf.reduce_mean(q_pi)
     q_loss = tf.reduce_mean((q-backup_n_step)**2)
@@ -607,7 +605,6 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
             ###############################################
             """
             # Logging: n-step offline + online expansion
-            exp_batch_size = 10   # size of examined batch
             exp_after_n_step = 0  # indicates expand based on online policy after observing exp_n_step offline experiences
             ground_truth_q, predicted_q = online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
                                                                env_name, batch_envs,
@@ -615,7 +612,6 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
             logger.store(PredictedQ=predicted_q, GroundTruthQ=ground_truth_q)
 
             # Logging: n-step online expansion + bootstrapped Q thereafter
-            exp_batch_size = 10
             exp_backup, exp_first, exp_second, exp_third, \
             n_s_backup, n_s_first, n_s_second, n_s_third = online_expand_first_n_step(sess, pi, q_pi_x_targ,
                                                                                      backups, dis_acc_first, dis_acc_following, dis_boots,
@@ -694,12 +690,15 @@ if __name__ == '__main__':
     parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--n_step', type=int, default=5)
     parser.add_argument('--backup_method', type=str,
-                        choices=['avg_n_step', 'min_n_step', '1_step', '2_step', '3_step', '4_step', '5_step'],
+                        choices=['avg_n_step', 'min_n_step', 'avg_n_step_exclude_1',
+                                 '1_step', '2_step', '3_step', '4_step', '5_step',
+                                 '6_step', '7_step', '8_step', '9_step', '10_step'],
                         default='avg_n_step')
+    parser.add_argument('--exp_batch_size', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--replay_size', type=int, default=int(1e6))
     parser.add_argument('--without_delay_train', action='store_true')
-    parser.add_argument('--exp_name', type=str, default='ddpg')
+    parser.add_argument('--exp_name', type=str, default='ddpg_n_step_new')
     parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
     parser.add_argument('--act_noise',type=float, default=0.1)
     parser.add_argument("--exploration-strategy", type=str, choices=["action_noise", "epsilon_greedy"],
@@ -727,6 +726,7 @@ if __name__ == '__main__':
                     ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
                     gamma=args.gamma, seed=args.seed,replay_size=args.replay_size,
                     n_step=args.n_step, backup_method=args.backup_method,
+                    exp_batch_size=args.exp_batch_size,
                     without_delay_train=args.without_delay_train,
                     epochs=args.epochs, save_freq=args.save_freq,
                     batch_size=args.batch_size,
