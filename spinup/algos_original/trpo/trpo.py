@@ -2,6 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import gym
+import pybulletgym
 import time
 import spinup.algos.trpo_origional.core as core
 from spinup.utils.logx import EpochLogger

@@ -2,6 +2,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import gym
+import pybulletgym
 import time
 from spinup.algos_original.sac import core
 from spinup.algos_original.sac.core import get_vars
