@@ -4,8 +4,8 @@ import tensorflow as tf
 import gym
 import pybulletgym
 import time
-from spinup.algos_origional.ddpg import core
-from spinup.algos_origional.ddpg.core import get_vars
+from spinup.algos_original.ddpg import core
+from spinup.algos_original.ddpg.core import get_vars
 from spinup.utils.logx import EpochLogger
 
 

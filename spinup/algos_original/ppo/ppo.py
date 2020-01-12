@@ -4,7 +4,7 @@ import tensorflow as tf
 import gym
 import pybulletgym
 import time
-import spinup.algos_origional.ppo.core as core
+import spinup.algos_original.ppo.core as core
 from spinup.utils.logx import EpochLogger
 from spinup.utils.mpi_tf import MpiAdamOptimizer, sync_all_params
 from spinup.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
