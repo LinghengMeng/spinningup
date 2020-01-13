@@ -1,26 +1,14 @@
+import tensorflow as tf
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-
-
 import pybulletgym
 import gym
 import time
 from spinup.algos.ddpg_n_step_new import core
 from spinup.algos.ddpg_n_step_new.core import get_vars, MLP
 from spinup.utils.logx import EpochLogger
-import os.path as osp
-
-import multiprocessing
-from multiprocessing import Process, Pool
-
-# import tkinter as tk
-# from tkinter import simpledialog
-# ROOT = tk.Tk()
-# ROOT.withdraw()
-
 from collections import deque
-
+import os.path as osp
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -34,15 +22,17 @@ class ReplayBuffer:
         self.obs_dim = obs_dim
         self.act_dim = act_dim
         self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
-        self.obs2_sim_state_buf = []
+        self.obs1_sim_state_buf = []
         self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
+        self.obs2_sim_state_buf = []
         self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
         self.rews_buf = np.zeros(size, dtype=np.float32)
         self.done_buf = np.zeros(size, dtype=np.float32)
         self.ptr, self.size, self.max_size = 0, 0, size
 
-    def store(self, obs, act, rew, next_obs, done, next_obs_sim_state):
+    def store(self, obs, obs_sim_state, act, rew, next_obs, next_obs_sim_state, done):
         self.obs1_buf[self.ptr] = obs
+        self.obs1_sim_state_buf.append(obs_sim_state)
         self.obs2_buf[self.ptr] = next_obs
         self.obs2_sim_state_buf.append(next_obs_sim_state)
         self.acts_buf[self.ptr] = act
@@ -75,7 +65,8 @@ class ReplayBuffer:
         batch_obs1 = np.zeros([batch_size, n_step, self.obs_dim])
         batch_obs2_sim_state = []
         batch_obs_restore = []
-        batch_obs_restore_sim_state = []
+        batch_obs1_sim_state = []
+        batch_obs2_sim_state = []
         batch_obs2 = np.zeros([batch_size, n_step, self.obs_dim])
         batch_acts = np.zeros([batch_size, n_step, self.act_dim])
         batch_rews = np.zeros([batch_size, n_step])
@@ -89,7 +80,8 @@ class ReplayBuffer:
 
         # Simulation state corresponds to obs2 for restoring
         for i in idxs:
-            batch_obs_restore_sim_state.append([self.obs2_sim_state_buf[i+s_i] for s_i in range(n_step)])
+            batch_obs1_sim_state.append([self.obs1_sim_state_buf[i + s_i] for s_i in range(n_step)])
+            batch_obs2_sim_state.append([self.obs2_sim_state_buf[i+s_i] for s_i in range(n_step)])
 
         # Set all done after the fist met one to 1
         done_index = np.asarray(np.where(batch_done==1))
@@ -102,13 +94,19 @@ class ReplayBuffer:
         batch_done = np.hstack((np.zeros((batch_size, 1)), batch_done))
         return dict(obs1=batch_obs1[:,0,:],
                     obs2=batch_obs2[:,:,:],
-                    obs2_sim_state=batch_obs_restore_sim_state,
+                    obs1_sim_state=batch_obs1_sim_state,
+                    obs2_sim_state=batch_obs2_sim_state,
                     acts=batch_acts[:,0,:],
                     rews=batch_rews,
                     done=batch_done)
 
 
 def pybulletenv_get_state(env):
+    """
+    Function used to get state information from PyBullet physics engine.
+    :param env:
+    :return:
+    """
     body_num = env.env._p.getNumBodies()
     # body_info = [env.env._p.getBodyInfo(body_i) for body_i in range(body_num)]
     floor_id, robot_id = 0, 1
@@ -128,6 +126,12 @@ def pybulletenv_get_state(env):
 
 
 def pybulletenv_set_state(env, state):
+    """
+    Function used to set state in PyBullet physics engine.
+    :param env:
+    :param state:
+    :return:
+    """
     body_num = env.env._p.getNumBodies()
     floor_id, robot_id = 0, 1
     joint_num = env.env._p.getNumJoints(robot_id)
@@ -143,7 +147,7 @@ def pybulletenv_set_state(env, state):
     return env
 
 def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
-                         env_name, batch_envs,
+                         env_name, env,
                          replay_buffer, n_step, exp_batch_size=10, exp_n_step=0):
     """
     This function is used to expand policy on environment to get ground true value for Q.
@@ -157,19 +161,29 @@ def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
     :return:
     """
     exp_batch = replay_buffer.sample_batch_n_step(exp_batch_size, n_step=n_step)
+
     # restore to state after exp_n_step step, then expand until termination.
     restore_obs_sim = pd.DataFrame(exp_batch['obs2_sim_state']).iloc[:, exp_n_step].tolist()
-
+    restore_obs1_sim = pd.DataFrame(exp_batch['obs1_sim_state']).iloc[:, 0].tolist()
     exp_outs = []
+    inaccurat_restore_count = 0
     for exp_b_i in range(exp_batch_size):
         # restore simulator state
-        _ = batch_envs[exp_b_i].reset()
-        if 'PyBulletEnv' in env_name:
-            pybulletenv_set_state(batch_envs[exp_b_i], restore_obs_sim[exp_b_i])
-        elif 'Roboschool' in env_name:
-            print('Roboschool is used.')
+        # AntPyBulletEnv and AntMuJoCoEnv are PyBullet-based implementation of Roboschool and MuJoCo environments.
+        if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
+            # reset twice to clear reward on progress
+            env.env._p.restoreState(restore_obs1_sim[exp_b_i])
         else:
-            batch_envs[exp_b_i].sim.set_state(restore_obs_sim[exp_b_i])  # MuJuco
+            env.sim.set_state(restore_obs1_sim[exp_b_i])  # MuJuco
+
+        # take the same action as the first step
+        old_act = exp_batch['acts'][exp_b_i].copy()
+        o2, r, done, _ = env.step(old_act)
+
+        allowed_obs_err = 1e-5
+        if (abs(o2 - exp_batch['obs2'][exp_b_i, exp_n_step, :].copy()) > allowed_obs_err).any():
+            inaccurat_restore_count += 1
+            # import pdb; pdb.set_trace()
 
         # expand until termination
         exp_o2 = exp_batch['obs2'][exp_b_i, exp_n_step, :].copy()    # np.copy() to copy array, otherwise copy reference
@@ -177,11 +191,13 @@ def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
         exp_dis_r = 0
         step = 0
         while not exp_done:
-            exp_o2, exp_r, exp_done, _ = batch_envs[exp_b_i].step(
+            exp_o2, exp_r, exp_done, _ = env.step(
                 sess.run(pi, feed_dict={x_ph: exp_o2.reshape(1, -1)})[0])
             exp_dis_r += (gamma ** step) * exp_r
             step += 1
         exp_outs.append(exp_dis_r)
+
+    print('Expand to End: inaccurat_restore_count={}'.format(inaccurat_restore_count))
     # Online expansion
     # expand based on current policy until termination, after first exp_n_step
     dis_acc_rew = np.asarray(exp_outs)
@@ -196,11 +212,75 @@ def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
     return ground_truth_q, predicted_q
 
 
-def online_expand_first_n_step(sess, pi, q_pi_x_targ,
-                               backups, dis_acc_first, dis_acc_following, dis_boots,
+# def online_expand_first_n_step(sess, pi, backups, dis_acc_first, dis_acc_following, dis_boots,
+#                                x_ph, x2_ph, r_ph, d_ph, batch_size_ph,
+#                                env_name, batch_envs,
+#                                replay_buffer, n_step, exp_batch_size=10):
+#     # Sample mini-batch
+#     exp_batch = replay_buffer.sample_batch_n_step(exp_batch_size, n_step=n_step)
+#     # create matrix to record n-step experiences where the first step is restored from past experience
+#     exp_rew = np.zeros(exp_batch['rews'].shape)
+#     exp_next_obs = np.zeros(exp_batch['obs2'].shape)
+#     exp_done = np.zeros(exp_batch['done'].shape)
+#     exp_next_obs[:, 0, :] = exp_batch['obs2'][:, 0, :].copy()
+#     exp_rew[:, 0] = exp_batch['rews'][:, 0].copy()
+#     exp_done[:, 0:2] = exp_batch['done'][:, 0:2].copy()
+#
+#     # Prepare restore states
+#     restore_obs_sim = pd.DataFrame(exp_batch['obs2_sim_state']).iloc[:, 0].tolist()
+#     for exp_b_i in range(exp_batch_size):
+#         # restore simulator state
+#         _ = batch_envs[exp_b_i].reset()
+#         if 'PyBulletEnv' in env_name:
+#             pybulletenv_set_state(batch_envs[exp_b_i], restore_obs_sim[exp_b_i])
+#         elif 'Roboschool' in env_name:
+#             print('Roboschool is used.')
+#         else:
+#             batch_envs[exp_b_i].sim.set_state(restore_obs_sim[exp_b_i])  # MuJuco
+#         # expand n-1 steps following 1st step
+#         o2 = exp_next_obs[exp_b_i, 0, :].copy()
+#         done = exp_done[exp_b_i, 1].copy() # the 1st done is only used to calculate accumulated reward
+#
+#         for s_i in range(n_step-1): # the following n-1 steps
+#             if done:
+#                 break
+#             else:
+#                 o2, r, done, _ = batch_envs[exp_b_i].step(sess.run(pi, feed_dict={x_ph: o2.reshape(1, -1)})[0])
+#                 exp_next_obs[exp_b_i, 1+s_i, :] = o2
+#                 exp_rew[exp_b_i, 1+s_i] = r
+#                 exp_done[exp_b_i, 2+s_i] = done
+#                 # print('exp_b_i={}, s_i= {}, done={}'.format(exp_b_i, s_i, done))
+#
+#     # set elements after first done=1 to 1
+#     done_index = np.asarray(np.where(exp_done == 1))
+#     for d_i in range(done_index.shape[1]):
+#         x, y = done_index[:, d_i]
+#         exp_done[x, y:] = 1
+#
+#     # 1st step + (n-1) step online expansion + bootstrapping
+#     exp_backup, exp_first, exp_second, exp_third = sess.run([backups[n_step - 1], dis_acc_first[n_step - 1],
+#                                                              dis_acc_following[n_step - 1], dis_boots[n_step - 1]],
+#                                                             feed_dict={x2_ph: exp_next_obs,
+#                                                                        r_ph: exp_rew,
+#                                                                        d_ph: exp_done,
+#                                                                        batch_size_ph: exp_batch_size})
+#     if (exp_second>1000).any():
+#         import pdb; pdb.set_trace()
+#     # 1st step + (n-1) step offline expansion + bootstrapping
+#     n_s_backup, n_s_first, n_s_second, n_s_third = sess.run([backups[n_step - 1], dis_acc_first[n_step - 1],
+#                                                              dis_acc_following[n_step - 1], dis_boots[n_step - 1]],
+#                                                             feed_dict={x2_ph: exp_batch['obs2'],
+#                                                                        r_ph: exp_batch['rews'],
+#                                                                        d_ph: exp_batch['done'],
+#                                                                        batch_size_ph: exp_batch_size})
+#     # import pdb;
+#     # pdb.set_trace()
+#     return exp_backup, exp_first, exp_second, exp_third, \
+#            n_s_backup, n_s_first, n_s_second, n_s_third
+
+def online_expand_first_n_step(sess, pi, backups, dis_acc_first, dis_acc_following, dis_boots,
                                x_ph, x2_ph, r_ph, d_ph, batch_size_ph,
-                               gamma,
-                               env_name, batch_envs,
+                               env_name, env,
                                replay_buffer, n_step, exp_batch_size=10):
     # Sample mini-batch
     exp_batch = replay_buffer.sample_batch_n_step(exp_batch_size, n_step=n_step)
@@ -208,35 +288,49 @@ def online_expand_first_n_step(sess, pi, q_pi_x_targ,
     exp_rew = np.zeros(exp_batch['rews'].shape)
     exp_next_obs = np.zeros(exp_batch['obs2'].shape)
     exp_done = np.zeros(exp_batch['done'].shape)
-    exp_next_obs[:, 0, :] = exp_batch['obs2'][:, 0, :]
-    exp_rew[:, 0] = exp_batch['rews'][:, 0]
-    exp_done[:, 0:2] = exp_batch['done'][:, 0:2]
+    exp_next_obs[:, 0, :] = exp_batch['obs2'][:, 0, :].copy()
+    exp_rew[:, 0] = exp_batch['rews'][:, 0].copy()
+    exp_done[:, 0:2] = exp_batch['done'][:, 0:2].copy()
 
     # Prepare restore states
-    restore_obs_sim = pd.DataFrame(exp_batch['obs2_sim_state']).iloc[:, 0].tolist()
+    restore_obs1_sim = pd.DataFrame(exp_batch['obs1_sim_state']).iloc[:, 0].tolist()
+    restore_obs2_sim = pd.DataFrame(exp_batch['obs2_sim_state']).iloc[:, 0].tolist()
+    inaccurat_restore_count = 0
     for exp_b_i in range(exp_batch_size):
         # restore simulator state
-        _ = batch_envs[exp_b_i].reset()
-        if 'PyBulletEnv' in env_name:
-            pybulletenv_set_state(batch_envs[exp_b_i], restore_obs_sim[exp_b_i])
-        elif 'Roboschool' in env_name:
-            print('Roboschool is used.')
+        if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
+            # reset twice to clear reward on progress
+            env.env._p.restoreState(restore_obs1_sim[exp_b_i])
         else:
-            batch_envs[exp_b_i].sim.set_state(restore_obs_sim[exp_b_i])  # MuJuco
+            env.sim.set_state(restore_obs1_sim[exp_b_i])  # MuJuco
+
+        # take the same action as the first step
+        old_act = exp_batch['acts'][exp_b_i].copy()
+        o2, r, done, _ = env.step(old_act)
+
+        allowed_obs_err = 1e-5
+        if (abs(o2-exp_next_obs[exp_b_i, 0, :].copy()) > allowed_obs_err).any():
+            inaccurat_restore_count += 1
+            # import pdb; pdb.set_trace()
+
+        # import pdb;
+        # pdb.set_trace()
         # expand n-1 steps following 1st step
-        o2 = exp_batch['obs2'][exp_b_i, 0, :].copy()
+        o2 = exp_next_obs[exp_b_i, 0, :].copy()
         done = exp_done[exp_b_i, 1].copy() # the 1st done is only used to calculate accumulated reward
 
         for s_i in range(n_step-1): # the following n-1 steps
             if done:
                 break
             else:
-                o2, r, done, _ = batch_envs[exp_b_i].step(
-                    sess.run(pi, feed_dict={x_ph: o2.reshape(1, -1)})[0])
+                # o2, r, done, _ = env_sim.step(sess.run(pi, feed_dict={x_ph: o2.reshape(1, -1)})[0])
+                o2, r, done, _ = env.step(sess.run(pi, feed_dict={x_ph: o2.reshape(1, -1)})[0])
                 exp_next_obs[exp_b_i, 1+s_i, :] = o2
                 exp_rew[exp_b_i, 1+s_i] = r
                 exp_done[exp_b_i, 2+s_i] = done
                 # print('exp_b_i={}, s_i= {}, done={}'.format(exp_b_i, s_i, done))
+
+    print('Expand n-step: inaccurat_restore_count={}'.format(inaccurat_restore_count))
 
     # set elements after first done=1 to 1
     done_index = np.asarray(np.where(exp_done == 1))
@@ -251,6 +345,8 @@ def online_expand_first_n_step(sess, pi, q_pi_x_targ,
                                                                        r_ph: exp_rew,
                                                                        d_ph: exp_done,
                                                                        batch_size_ph: exp_batch_size})
+    if (exp_second>100).any():
+        import pdb; pdb.set_trace()
     # 1st step + (n-1) step offline expansion + bootstrapping
     n_s_backup, n_s_first, n_s_second, n_s_third = sess.run([backups[n_step - 1], dis_acc_first[n_step - 1],
                                                              dis_acc_following[n_step - 1], dis_boots[n_step - 1]],
@@ -258,7 +354,8 @@ def online_expand_first_n_step(sess, pi, q_pi_x_targ,
                                                                        r_ph: exp_batch['rews'],
                                                                        d_ph: exp_batch['done'],
                                                                        batch_size_ph: exp_batch_size})
-
+    # import pdb;
+    # pdb.set_trace()
     return exp_backup, exp_first, exp_second, exp_third, \
            n_s_backup, n_s_first, n_s_second, n_s_third
 
@@ -267,7 +364,9 @@ def online_expand_first_n_step(sess, pi, q_pi_x_targ,
 Deep Deterministic Policy Gradient (DDPG)
 
 """
-def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
+def ddpg_n_step_new(env_name, render_env=False,
+                    actor_hidden_layers=[300, 300], critic_hidden_layers=[300, 300],
+                    seed=0,
                     steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99,
                     n_step=1, backup_method='mixed_n_step', exp_batch_size=10,
                     without_delay_train=False,
@@ -347,7 +446,7 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
     tf.set_random_seed(seed)
     np.random.seed(seed)
 
-    if 'PyBulletEnv' in env_name:
+    if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
         print('PyBulletEnv is used.')
     elif 'Roboschool' in env_name:
         print('Roboschool is used.')
@@ -355,15 +454,12 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
         print('MuJoCo is used.')
 
     env, test_env = gym.make(env_name), gym.make(env_name)
-    batch_envs = [gym.make(env_name) for tmp_i in range(batch_size)]
+    # log_env = gym.make(env_name)
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.shape[0]
 
     # Action limit for clamping: critically, assumes all dimensions share the same bound!
     act_limit = env.action_space.high[0]
-
-    # Share information about action space with policy architecture
-    ac_kwargs['action_space'] = env.action_space
 
     # Inputs to computation graph
     x_ph = tf.placeholder(dtype=tf.float32, shape=(None, obs_dim))
@@ -374,7 +470,8 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
     n_step_ph = tf.placeholder(dtype=tf.float32, shape=())
     batch_size_ph = tf.placeholder(dtype=tf.int32)
 
-    hidden_sizes = list(ac_kwargs['hidden_sizes'])
+    actor_hidden_sizes = actor_hidden_layers
+    critic_hidden_sizes = critic_hidden_layers
     actor_hidden_activation = tf.keras.activations.relu
     actor_output_activation = tf.keras.activations.tanh
     critic_hidden_activation = tf.keras.activations.relu
@@ -382,32 +479,30 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
 
     # Main outputs from computation graph
     with tf.variable_scope('main'):
-        actor = MLP(layer_sizes=hidden_sizes + [act_dim],
+        actor = MLP(layer_sizes=actor_hidden_sizes + [act_dim],
                     hidden_activation=actor_hidden_activation, output_activation=actor_output_activation)
-        critic = MLP(layer_sizes=hidden_sizes + [1],
+        critic = MLP(layer_sizes=critic_hidden_sizes + [1],
                      hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
         pi = act_limit * actor(x_ph)
         q = tf.squeeze(critic(tf.concat([x_ph, a_ph], axis=-1)), axis=1)
         q_pi = tf.squeeze(critic(tf.concat([x_ph, pi], axis=-1)), axis=1)
-    
+
     # Target networks
     with tf.variable_scope('target'):
-        # Note that the action placeholder going to actor_critic here is 
+        # Note that the action placeholder going to actor_critic here is
         # irrelevant, because we only need q_targ(s, pi_targ(s)).
-        actor_targ = MLP(layer_sizes=hidden_sizes + [act_dim],
+        actor_targ = MLP(layer_sizes=actor_hidden_sizes + [act_dim],
                          hidden_activation=actor_hidden_activation, output_activation=actor_output_activation)
-        critic_targ = MLP(layer_sizes=hidden_sizes + [1],
+        critic_targ = MLP(layer_sizes=critic_hidden_sizes + [1],
                           hidden_activation=critic_hidden_activation, output_activation=critic_output_activation)
-        pi_x_targ = act_limit * actor_targ(x_ph)
-        q_pi_x_targ = tf.squeeze(critic_targ(tf.concat([x_ph, pi_x_targ], axis=-1)), axis=1)
 
-        n_step_bootstrapped_q = []
-        for n_step_i in range(n_step):
-            # slice next_obs for different n
-            next_obs_tmp = tf.reshape(tf.slice(x2_ph, [0, n_step_i, 0], [batch_size_ph, 1, obs_dim]), [batch_size_ph, obs_dim])
-            pi_targ_tmp = act_limit * actor_targ(next_obs_tmp)
-            q_pi_targ = tf.squeeze(critic_targ(tf.concat([next_obs_tmp, pi_targ_tmp], axis=-1)), axis=1)
-            n_step_bootstrapped_q.append(q_pi_targ)
+    n_step_bootstrapped_q = []
+    for n_step_i in range(n_step):
+        # slice next_obs for different n
+        next_obs_tmp = tf.reshape(tf.slice(x2_ph, [0, n_step_i, 0], [batch_size_ph, 1, obs_dim]), [batch_size_ph, obs_dim])
+        pi_targ_tmp = act_limit * actor_targ(next_obs_tmp)
+        q_pi_targ = tf.squeeze(critic_targ(tf.concat([next_obs_tmp, pi_targ_tmp], axis=-1)), axis=1)
+        n_step_bootstrapped_q.append(q_pi_targ)
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
@@ -438,31 +533,28 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
         dis_boots.append(boots_q)
         backups.append(backup_tmp)
 
-    # backup_n_step = backups[-1]
+    # Define different backup methods
     backup_avg_n_step = tf.stop_gradient(tf.reduce_mean(tf.stack(backups, axis=1), axis=1))
     backup_min_n_step = tf.stop_gradient(tf.reduce_min(tf.stack(backups, axis=1), axis=1))
     backup_avg_n_step_exclude_1 = tf.stop_gradient(tf.reduce_mean(tf.stack(backups[1:], axis=1), axis=1))
 
     if backup_method == 'avg_n_step':
-        backup_n_step = backup_avg_n_step
+        backup = backup_avg_n_step
     elif backup_method == 'min_n_step':
-        backup_n_step = backup_min_n_step
+        backup = backup_min_n_step
     elif backup_method == 'avg_n_step_exclude_1':
-        backup_n_step = backup_avg_n_step_exclude_1
+        backup = backup_avg_n_step_exclude_1
     else:
         tmp_step, _ = backup_method.split('_')
         tmp_step = int(tmp_step)
         if 1 <= tmp_step and tmp_step <= n_step:
-            backup_n_step = backups[tmp_step-1]
+            backup = backups[tmp_step-1]
         else:
             raise Exception('Wrong backup_method!')
 
     # DDPG losses
     pi_loss = -tf.reduce_mean(q_pi)
-    q_loss = tf.reduce_mean((q-backup_n_step)**2)
-
-    # TOdo: log gradient to see how it change with overestimation problem, and we can clip gradient if overestimation
-    #   happended
+    q_loss = tf.reduce_mean((q-backup)**2)
 
     # Separate train ops for pi, q
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
@@ -481,12 +573,19 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
                             for v_main, v_targ in zip(actor.variables + critic.variables,
                                                       actor_targ.variables + critic_targ.variables)])
 
-    sess = tf.Session()
+    # Initialize variables and target networks
+    sess = tf.keras.backend.get_session()
     sess.run(tf.global_variables_initializer())
     sess.run(target_init)
 
-    # Setup model saving
-    logger.setup_tf_saver(sess, inputs={'x': x_ph, 'a': a_ph}, outputs={'pi': pi, 'q': q})
+    # restore actor-critic model
+    restore_actor_critic_model = False
+    if restore_actor_critic_model:
+        model_path = r"C:\Users\Lingheng\Google Drive\git_repos\spinup_data\2020-01-12_ddpg_n_step_new_AntPyBulletEnv_v0\2020-01-12_10-15-53-ddpg_n_step_new_AntPyBulletEnv_v0_s0"
+
+        actor.load_weights(os.path.join(model_path, 'checkpoints', 'epoch90_actor'))
+        critic.load_weights(os.path.join(model_path, 'checkpoints', 'epoch90_critic'))
+        sess.run(target_init)
 
     def get_action(o, noise_scale):
         a = sess.run(pi, feed_dict={x_ph: o.reshape(1,-1)})[0]
@@ -505,8 +604,11 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
 
     start_time = time.time()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
-    for b_env in batch_envs:
-        _ = b_env.reset()
+    if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
+        o_sim_state = env.env._p.saveState()
+    else:
+        o_sim_state = env.sim.get_state()  # MuJuco
+
     old_ep_ret = 0
     max_ep_ret = 0
     ep_ret_history = deque(maxlen=5)
@@ -531,10 +633,8 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
             env.render()
         o2, r, d, _ = env.step(a)
 
-        if 'PyBulletEnv' in env_name:
-            o2_sim_state = pybulletenv_get_state(env)
-        elif 'Roboschool' in env_name:
-            print('Roboschool is used.')
+        if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
+            o2_sim_state = env.env._p.saveState()
         else:
             o2_sim_state = env.sim.get_state()  # MuJuco
 
@@ -547,11 +647,12 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        replay_buffer.store(o, a, r, o2, d, o2_sim_state)
+        replay_buffer.store(o, o_sim_state, a, r, o2, o2_sim_state, d)
 
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
         o = o2
+        o_sim_state = o2_sim_state
 
         if without_delay_train:
             # batch = replay_buffer.sample_batch(batch_size)
@@ -607,16 +708,16 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
             # Logging: n-step offline + online expansion
             exp_after_n_step = 0  # indicates expand based on online policy after observing exp_n_step offline experiences
             ground_truth_q, predicted_q = online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
-                                                               env_name, batch_envs,
+                                                               env_name, env,
                                                                replay_buffer, n_step, exp_batch_size, exp_after_n_step)
             logger.store(PredictedQ=predicted_q, GroundTruthQ=ground_truth_q)
 
             # Logging: n-step online expansion + bootstrapped Q thereafter
             exp_backup, exp_first, exp_second, exp_third, \
-            n_s_backup, n_s_first, n_s_second, n_s_third = online_expand_first_n_step(sess, pi, q_pi_x_targ,
+            n_s_backup, n_s_first, n_s_second, n_s_third = online_expand_first_n_step(sess, pi,
                                                                                      backups, dis_acc_first, dis_acc_following, dis_boots,
                                                                                      x_ph, x2_ph, r_ph, d_ph, batch_size_ph,
-                                                                                     gamma, env_name, batch_envs,
+                                                                                     env_name, env,
                                                                                      replay_buffer, n_step, exp_batch_size)
 
             logger.store(NStepOfflineBackup=n_s_backup, NStepOfflineFir=n_s_first,
@@ -626,11 +727,13 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
             """
             ###############################################
             """
-            # import pdb;
-            # pdb.set_trace()
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
+            if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
+                o_sim_state = env.env._p.saveState()
+            else:
+                o_sim_state = env.sim.get_state()  # MuJuco
 
         # End of epoch wrap-up
         if t > 0 and t % steps_per_epoch == 0:
@@ -659,7 +762,6 @@ def ddpg_n_step_new(env_name, render_env=False, actor_critic=core.mlp_actor_crit
             logger.log_tabular('LossQ', average_only=True)
             for n_step_i in range(n_step):
                 logger.log_tabular('QBackup{}Step'.format(n_step_i+1), with_min_and_max=True)
-                # logger.log_tabular('QBackupOnPolicy{}Step'.format(n_step_i + 1), with_min_and_max=True)
             logger.log_tabular('QBackupAvgNStep', with_min_and_max=True)
             logger.log_tabular('QBackupMinNStep', with_min_and_max=True)
             logger.log_tabular('PredictedQ', with_min_and_max=True)
@@ -680,8 +782,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
     parser.add_argument('--render_env', action="store_true")
-    parser.add_argument('--hid', type=int, default=300)
-    parser.add_argument('--l', type=int, default=2)
+    parser.add_argument('--actor_hidden_layers', nargs='+', type=int, default=[300, 300])
+    parser.add_argument('--critic_hidden_layers', nargs='+', type=int, default=[300, 300])
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=200)
@@ -707,23 +809,23 @@ if __name__ == '__main__':
     parser.add_argument("--epsilon-min", type=float, default=.01, help='minimum of epsilon')
     parser.add_argument("--epsilon-decay", type=float, default=.001, help='epsilon decay')
 
-    parser.add_argument("--data_dir", type=str, default=None)
+    parser.add_argument("--data_dir", type=str, default='spinup_data')
 
     args = parser.parse_args()
 
     # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
     data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
-                        'spinup_data')
+                        args.data_dir)
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
 
     # if args.hardcopy_target_nn:
     #     polyak = 0
 
     ddpg_n_step_new(env_name=args.env, render_env=args.render_env,
+                    actor_hidden_layers=args.actor_hidden_layers,
+                    critic_hidden_layers=args.critic_hidden_layers,
                     act_noise=args.act_noise,
-                    actor_critic=core.mlp_actor_critic,
-                    ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
                     gamma=args.gamma, seed=args.seed,replay_size=args.replay_size,
                     n_step=args.n_step, backup_method=args.backup_method,
                     exp_batch_size=args.exp_batch_size,
