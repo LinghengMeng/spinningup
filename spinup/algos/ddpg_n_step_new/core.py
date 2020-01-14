@@ -23,17 +23,6 @@ def count_vars(scope):
 """
 Actor-Critics
 """
-def mlp_actor_critic(x, a, hidden_sizes=(400,300), activation=tf.nn.relu, 
-                     output_activation=tf.tanh, action_space=None):
-    act_dim = a.shape.as_list()[-1]
-    act_limit = action_space.high[0]
-    with tf.variable_scope('pi'):
-        pi = act_limit * mlp(x, list(hidden_sizes)+[act_dim], activation, output_activation)
-    with tf.variable_scope('q'):
-        q = tf.squeeze(mlp(tf.concat([x,a], axis=-1), list(hidden_sizes)+[1], activation, None), axis=1)
-    with tf.variable_scope('q', reuse=True):
-        q_pi = tf.squeeze(mlp(tf.concat([x,pi], axis=-1), list(hidden_sizes)+[1], activation, None), axis=1)
-    return pi, q, q_pi
 
 class MLP(tf.keras.Model):
     def __init__(self, layer_sizes=[32],

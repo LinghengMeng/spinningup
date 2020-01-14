@@ -4,8 +4,7 @@ import pandas as pd
 import pybulletgym
 import gym
 import time
-from spinup.algos.ddpg_n_step_new import core
-from spinup.algos.ddpg_n_step_new.core import get_vars, MLP
+from spinup.algos.ddpg_n_step_new.core import MLP
 from spinup.utils.logx import EpochLogger
 from collections import deque
 import os.path as osp
@@ -23,18 +22,23 @@ class ReplayBuffer:
         self.act_dim = act_dim
         self.obs1_buf = np.zeros([size, obs_dim], dtype=np.float32)
         self.obs1_sim_state_buf = []
+        self.obs1_ela_steps = np.zeros(size, dtype=np.int)
         self.obs2_buf = np.zeros([size, obs_dim], dtype=np.float32)
         self.obs2_sim_state_buf = []
+        self.obs2_ela_steps = np.zeros(size, dtype=np.int)
         self.acts_buf = np.zeros([size, act_dim], dtype=np.float32)
         self.rews_buf = np.zeros(size, dtype=np.float32)
         self.done_buf = np.zeros(size, dtype=np.float32)
         self.ptr, self.size, self.max_size = 0, 0, size
 
-    def store(self, obs, obs_sim_state, act, rew, next_obs, next_obs_sim_state, done):
+    def store(self, obs, obs_sim_state, obs_elapsed_steps, act, rew,
+              next_obs, next_obs_sim_state, next_obs_elapsed_steps, done):
         self.obs1_buf[self.ptr] = obs
         self.obs1_sim_state_buf.append(obs_sim_state)
+        self.obs1_ela_steps[self.ptr] = obs_elapsed_steps
         self.obs2_buf[self.ptr] = next_obs
         self.obs2_sim_state_buf.append(next_obs_sim_state)
+        self.obs2_ela_steps[self.ptr] = next_obs_elapsed_steps
         self.acts_buf[self.ptr] = act
         self.rews_buf[self.ptr] = rew
         self.done_buf[self.ptr] = done
@@ -63,17 +67,20 @@ class ReplayBuffer:
         """
         idxs = np.random.randint(0, self.size-(n_step-1), size=batch_size)
         batch_obs1 = np.zeros([batch_size, n_step, self.obs_dim])
-        batch_obs2_sim_state = []
-        batch_obs_restore = []
+        batch_obs2 = np.zeros([batch_size, n_step, self.obs_dim])
         batch_obs1_sim_state = []
         batch_obs2_sim_state = []
-        batch_obs2 = np.zeros([batch_size, n_step, self.obs_dim])
+        batch_obs1_ela_steps = np.zeros([batch_size, n_step])
+        batch_obs2_ela_steps = np.zeros([batch_size, n_step])
         batch_acts = np.zeros([batch_size, n_step, self.act_dim])
         batch_rews = np.zeros([batch_size, n_step])
+        batch_rews_potential = np.zeros([batch_size, n_step])
         batch_done = np.zeros([batch_size, n_step])
         for i in range(n_step):
             batch_obs1[:, i, :] = self.obs1_buf[idxs+i]
             batch_obs2[:, i, :] = self.obs2_buf[idxs + i]
+            batch_obs1_ela_steps[:, i] = self.obs1_ela_steps[idxs + i]
+            batch_obs2_ela_steps[:, i] = self.obs2_ela_steps[idxs + i]
             batch_acts[:, i, :] = self.acts_buf[idxs + i]
             batch_rews[:, i] = self.rews_buf[idxs + i]
             batch_done[:, i] = self.done_buf[idxs + i]
@@ -92,98 +99,78 @@ class ReplayBuffer:
             import pdb; pdb.set_trace()
 
         batch_done = np.hstack((np.zeros((batch_size, 1)), batch_done))
-        return dict(obs1=batch_obs1[:,0,:],
-                    obs2=batch_obs2[:,:,:],
+        return dict(obs1=batch_obs1[:, 0, :],
+                    obs2=batch_obs2[:, :, :],
                     obs1_sim_state=batch_obs1_sim_state,
                     obs2_sim_state=batch_obs2_sim_state,
-                    acts=batch_acts[:,0,:],
+                    obs1_ela_steps=batch_obs1_ela_steps,
+                    obs2_ela_steps=batch_obs2_ela_steps,
+                    acts=batch_acts[:, 0, :],
                     rews=batch_rews,
+                    rews_potential=batch_rews_potential,
                     done=batch_done)
 
+def get_sim_state_and_elapsed_steps(env, env_name):
+    if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
+        o_sim_state = env.env._p.saveState()
+    else:
+        o_sim_state = env.sim.get_state()  # MuJuco
+    o_elapsed_steps = env._elapsed_steps
+    return o_sim_state, o_elapsed_steps
 
-def pybulletenv_get_state(env):
+def restore_simulation_state(env, env_name, res_sim_state, res_obs, res_ela_steps):
     """
-    Function used to get state information from PyBullet physics engine.
-    :param env:
-    :return:
+    Function used to restore simulation state.
     """
-    body_num = env.env._p.getNumBodies()
-    # body_info = [env.env._p.getBodyInfo(body_i) for body_i in range(body_num)]
-    floor_id, robot_id = 0, 1
+    # restore simulator state
+    _ = env.reset()     # (crucial to reset env._elapsed_steps)
+    env._elapsed_steps = res_ela_steps  # Crucial to reset elapsed step in simulator
+    if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
+        # env.robot.feet_contact is calculated in env.step(), so we need to reset it after restore joints and position.
+        # https://github.com/benelot/pybullet-gym/blob/master/pybulletgym/envs/roboschool/envs/locomotion/walker_base_env.py
+        # 1. restoreState
+        # 2. restore feet_contact
+        # 3. call env.robot.calc_state() to prepare walk_target_dist for env.robot.calc_potential()
+        # 4. restore potential (used to calculate progress but only updated when calling env.step())
+        env.env._p.restoreState(res_sim_state)  # Use env.env._p.getContactPoints() to see contact point info.
+        env.robot.feet_contact = res_obs[-len(env.robot.feet):].copy()
+        # Crucial call sequence: 1. calc_state() 2. calc_potential()
+        #   (as calc_potential() needs walk_target_dist which is calculated in calc_state() which further depends on state.)
+        obs_after_restore = env.robot.calc_state()
+        env.env.potential = env.robot.calc_potential()
+    else:
+        # Different from PyBulletGym, forward_reward is calculated by state in env.step() rather than keeping
+        #   potential proterty.
+        # 1. restore state
+        # 2. call env.sim.forward() to complete restoration state
+        env.sim.set_state(res_sim_state)  # MuJuco
+        env.sim.forward()
+        obs_after_restore = env.env._get_obs()
 
-    robot_base_pos_ori = env.env._p.getBasePositionAndOrientation(robot_id)
-    robot_base_vel = env.env._p.getBaseVelocity(robot_id)
-
-    joint_num = env.env._p.getNumJoints(robot_id)
-    joint_state = []
-    for joint_i in range(joint_num):
-        joint_state.append(env.env._p.getJointState(robot_id, joint_i))
-
-    state = {'body_num': body_num,
-             'robot_base_pos_ori': robot_base_pos_ori, 'robot_base_vel': robot_base_vel,
-             'joint_num': joint_num, 'joint_state': joint_state}
-    return state
-
-
-def pybulletenv_set_state(env, state):
-    """
-    Function used to set state in PyBullet physics engine.
-    :param env:
-    :param state:
-    :return:
-    """
-    body_num = env.env._p.getNumBodies()
-    floor_id, robot_id = 0, 1
-    joint_num = env.env._p.getNumJoints(robot_id)
-    if body_num != state['body_num'] and joint_num != state['body_num']:
-        print('Set state error.')
-    # restore state
-    env.env._p.resetBasePositionAndOrientation(robot_id,
-                                               state['robot_base_pos_ori'][0],
-                                               state['robot_base_pos_ori'][1])
-    env.env._p.resetBaseVelocity(robot_id, state['robot_base_vel'])
-    for j_i, j_s in enumerate(state['joint_state']):
-        env.env._p.resetJointState(robot_id, j_i, j_s[0], j_s[1])
-    return env
+    # examine if restore is correct.
+    allowed_obs_err = 1e-4
+    if (abs(res_obs - obs_after_restore) > allowed_obs_err).any():
+        raise Exception('Restore state fail in online_expand_first_n_step!')
+    else:
+        return env
 
 def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
                          env_name, env,
                          replay_buffer, n_step, exp_batch_size=10, exp_n_step=0):
     """
     This function is used to expand policy on environment to get ground true value for Q.
-    :param sess:
-    :param q:
-    :param x_ph:
-    :param a_ph:
-    :param replay_buffer:
-    :param exp_batch_size:
-    :param exp_n_step:
-    :return:
     """
     exp_batch = replay_buffer.sample_batch_n_step(exp_batch_size, n_step=n_step)
 
     # restore to state after exp_n_step step, then expand until termination.
-    restore_obs_sim = pd.DataFrame(exp_batch['obs2_sim_state']).iloc[:, exp_n_step].tolist()
-    restore_obs1_sim = pd.DataFrame(exp_batch['obs1_sim_state']).iloc[:, 0].tolist()
+    restore_obs2_sim = pd.DataFrame(exp_batch['obs2_sim_state']).iloc[:, 0].tolist()
     exp_outs = []
-    inaccurat_restore_count = 0
     for exp_b_i in range(exp_batch_size):
-        # restore simulator state
-        # AntPyBulletEnv and AntMuJoCoEnv are PyBullet-based implementation of Roboschool and MuJoCo environments.
-        if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
-            # reset twice to clear reward on progress
-            env.env._p.restoreState(restore_obs1_sim[exp_b_i])
-        else:
-            env.sim.set_state(restore_obs1_sim[exp_b_i])  # MuJuco
-
-        # take the same action as the first step
-        old_act = exp_batch['acts'][exp_b_i].copy()
-        o2, r, done, _ = env.step(old_act)
-
-        allowed_obs_err = 1e-5
-        if (abs(o2 - exp_batch['obs2'][exp_b_i, exp_n_step, :].copy()) > allowed_obs_err).any():
-            inaccurat_restore_count += 1
-            # import pdb; pdb.set_trace()
+        # restore simulation state
+        res_sim_state = restore_obs2_sim[exp_b_i]
+        res_obs = exp_batch['obs2'][exp_b_i, 0, :]
+        res_ela_steps = exp_batch['obs2_ela_steps'][exp_b_i, 0].copy()
+        env = restore_simulation_state(env, env_name, res_sim_state, res_obs, res_ela_steps)
 
         # expand until termination
         exp_o2 = exp_batch['obs2'][exp_b_i, exp_n_step, :].copy()    # np.copy() to copy array, otherwise copy reference
@@ -197,7 +184,6 @@ def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
             step += 1
         exp_outs.append(exp_dis_r)
 
-    print('Expand to End: inaccurat_restore_count={}'.format(inaccurat_restore_count))
     # Online expansion
     # expand based on current policy until termination, after first exp_n_step
     dis_acc_rew = np.asarray(exp_outs)
@@ -211,72 +197,6 @@ def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
     predicted_q = sess.run(q, feed_dict={x_ph: exp_batch['obs1'], a_ph: exp_batch['acts']})
     return ground_truth_q, predicted_q
 
-
-# def online_expand_first_n_step(sess, pi, backups, dis_acc_first, dis_acc_following, dis_boots,
-#                                x_ph, x2_ph, r_ph, d_ph, batch_size_ph,
-#                                env_name, batch_envs,
-#                                replay_buffer, n_step, exp_batch_size=10):
-#     # Sample mini-batch
-#     exp_batch = replay_buffer.sample_batch_n_step(exp_batch_size, n_step=n_step)
-#     # create matrix to record n-step experiences where the first step is restored from past experience
-#     exp_rew = np.zeros(exp_batch['rews'].shape)
-#     exp_next_obs = np.zeros(exp_batch['obs2'].shape)
-#     exp_done = np.zeros(exp_batch['done'].shape)
-#     exp_next_obs[:, 0, :] = exp_batch['obs2'][:, 0, :].copy()
-#     exp_rew[:, 0] = exp_batch['rews'][:, 0].copy()
-#     exp_done[:, 0:2] = exp_batch['done'][:, 0:2].copy()
-#
-#     # Prepare restore states
-#     restore_obs_sim = pd.DataFrame(exp_batch['obs2_sim_state']).iloc[:, 0].tolist()
-#     for exp_b_i in range(exp_batch_size):
-#         # restore simulator state
-#         _ = batch_envs[exp_b_i].reset()
-#         if 'PyBulletEnv' in env_name:
-#             pybulletenv_set_state(batch_envs[exp_b_i], restore_obs_sim[exp_b_i])
-#         elif 'Roboschool' in env_name:
-#             print('Roboschool is used.')
-#         else:
-#             batch_envs[exp_b_i].sim.set_state(restore_obs_sim[exp_b_i])  # MuJuco
-#         # expand n-1 steps following 1st step
-#         o2 = exp_next_obs[exp_b_i, 0, :].copy()
-#         done = exp_done[exp_b_i, 1].copy() # the 1st done is only used to calculate accumulated reward
-#
-#         for s_i in range(n_step-1): # the following n-1 steps
-#             if done:
-#                 break
-#             else:
-#                 o2, r, done, _ = batch_envs[exp_b_i].step(sess.run(pi, feed_dict={x_ph: o2.reshape(1, -1)})[0])
-#                 exp_next_obs[exp_b_i, 1+s_i, :] = o2
-#                 exp_rew[exp_b_i, 1+s_i] = r
-#                 exp_done[exp_b_i, 2+s_i] = done
-#                 # print('exp_b_i={}, s_i= {}, done={}'.format(exp_b_i, s_i, done))
-#
-#     # set elements after first done=1 to 1
-#     done_index = np.asarray(np.where(exp_done == 1))
-#     for d_i in range(done_index.shape[1]):
-#         x, y = done_index[:, d_i]
-#         exp_done[x, y:] = 1
-#
-#     # 1st step + (n-1) step online expansion + bootstrapping
-#     exp_backup, exp_first, exp_second, exp_third = sess.run([backups[n_step - 1], dis_acc_first[n_step - 1],
-#                                                              dis_acc_following[n_step - 1], dis_boots[n_step - 1]],
-#                                                             feed_dict={x2_ph: exp_next_obs,
-#                                                                        r_ph: exp_rew,
-#                                                                        d_ph: exp_done,
-#                                                                        batch_size_ph: exp_batch_size})
-#     if (exp_second>1000).any():
-#         import pdb; pdb.set_trace()
-#     # 1st step + (n-1) step offline expansion + bootstrapping
-#     n_s_backup, n_s_first, n_s_second, n_s_third = sess.run([backups[n_step - 1], dis_acc_first[n_step - 1],
-#                                                              dis_acc_following[n_step - 1], dis_boots[n_step - 1]],
-#                                                             feed_dict={x2_ph: exp_batch['obs2'],
-#                                                                        r_ph: exp_batch['rews'],
-#                                                                        d_ph: exp_batch['done'],
-#                                                                        batch_size_ph: exp_batch_size})
-#     # import pdb;
-#     # pdb.set_trace()
-#     return exp_backup, exp_first, exp_second, exp_third, \
-#            n_s_backup, n_s_first, n_s_second, n_s_third
 
 def online_expand_first_n_step(sess, pi, backups, dis_acc_first, dis_acc_following, dis_boots,
                                x_ph, x2_ph, r_ph, d_ph, batch_size_ph,
@@ -293,28 +213,14 @@ def online_expand_first_n_step(sess, pi, backups, dis_acc_first, dis_acc_followi
     exp_done[:, 0:2] = exp_batch['done'][:, 0:2].copy()
 
     # Prepare restore states
-    restore_obs1_sim = pd.DataFrame(exp_batch['obs1_sim_state']).iloc[:, 0].tolist()
     restore_obs2_sim = pd.DataFrame(exp_batch['obs2_sim_state']).iloc[:, 0].tolist()
-    inaccurat_restore_count = 0
     for exp_b_i in range(exp_batch_size):
-        # restore simulator state
-        if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
-            # reset twice to clear reward on progress
-            env.env._p.restoreState(restore_obs1_sim[exp_b_i])
-        else:
-            env.sim.set_state(restore_obs1_sim[exp_b_i])  # MuJuco
+        # restore simulation state
+        res_sim_state = restore_obs2_sim[exp_b_i]
+        res_obs = exp_next_obs[exp_b_i, 0, :]
+        res_ela_steps = exp_batch['obs2_ela_steps'][exp_b_i, 0].copy()
+        env = restore_simulation_state(env, env_name, res_sim_state, res_obs, res_ela_steps)
 
-        # take the same action as the first step
-        old_act = exp_batch['acts'][exp_b_i].copy()
-        o2, r, done, _ = env.step(old_act)
-
-        allowed_obs_err = 1e-5
-        if (abs(o2-exp_next_obs[exp_b_i, 0, :].copy()) > allowed_obs_err).any():
-            inaccurat_restore_count += 1
-            # import pdb; pdb.set_trace()
-
-        # import pdb;
-        # pdb.set_trace()
         # expand n-1 steps following 1st step
         o2 = exp_next_obs[exp_b_i, 0, :].copy()
         done = exp_done[exp_b_i, 1].copy() # the 1st done is only used to calculate accumulated reward
@@ -323,14 +229,10 @@ def online_expand_first_n_step(sess, pi, backups, dis_acc_first, dis_acc_followi
             if done:
                 break
             else:
-                # o2, r, done, _ = env_sim.step(sess.run(pi, feed_dict={x_ph: o2.reshape(1, -1)})[0])
                 o2, r, done, _ = env.step(sess.run(pi, feed_dict={x_ph: o2.reshape(1, -1)})[0])
                 exp_next_obs[exp_b_i, 1+s_i, :] = o2
                 exp_rew[exp_b_i, 1+s_i] = r
                 exp_done[exp_b_i, 2+s_i] = done
-                # print('exp_b_i={}, s_i= {}, done={}'.format(exp_b_i, s_i, done))
-
-    print('Expand n-step: inaccurat_restore_count={}'.format(inaccurat_restore_count))
 
     # set elements after first done=1 to 1
     done_index = np.asarray(np.where(exp_done == 1))
@@ -345,8 +247,6 @@ def online_expand_first_n_step(sess, pi, backups, dis_acc_first, dis_acc_followi
                                                                        r_ph: exp_rew,
                                                                        d_ph: exp_done,
                                                                        batch_size_ph: exp_batch_size})
-    if (exp_second>100).any():
-        import pdb; pdb.set_trace()
     # 1st step + (n-1) step offline expansion + bootstrapping
     n_s_backup, n_s_first, n_s_second, n_s_third = sess.run([backups[n_step - 1], dis_acc_first[n_step - 1],
                                                              dis_acc_following[n_step - 1], dis_boots[n_step - 1]],
@@ -354,8 +254,8 @@ def online_expand_first_n_step(sess, pi, backups, dis_acc_first, dis_acc_followi
                                                                        r_ph: exp_batch['rews'],
                                                                        d_ph: exp_batch['done'],
                                                                        batch_size_ph: exp_batch_size})
-    # import pdb;
-    # pdb.set_trace()
+    if (exp_second > 200).any():
+        import pdb; pdb.set_trace()
     return exp_backup, exp_first, exp_second, exp_third, \
            n_s_backup, n_s_first, n_s_second, n_s_third
 
@@ -443,18 +343,11 @@ def ddpg_n_step_new(env_name, render_env=False,
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
 
-    tf.set_random_seed(seed)
+    # tf.set_random_seed(seed)
+    tf.random.set_seed(seed)
     np.random.seed(seed)
 
-    if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
-        print('PyBulletEnv is used.')
-    elif 'Roboschool' in env_name:
-        print('Roboschool is used.')
-    else:
-        print('MuJoCo is used.')
-
     env, test_env = gym.make(env_name), gym.make(env_name)
-    # log_env = gym.make(env_name)
     obs_dim = env.observation_space.shape[0]
     act_dim = env.action_space.shape[0]
 
@@ -508,10 +401,7 @@ def ddpg_n_step_new(env_name, render_env=False,
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
 
     # Bellman backup for Q function
-    dis_acc_first = []
-    dis_acc_following = []
-    dis_boots = []
-    backups = []
+    dis_acc_first, dis_acc_following, dis_boots, backups = [], [], [], []
     for n_step_i in range(1, n_step+1):
         # for k = 0,..., n-1: (1-done) * gamma**(k) * reward
         dis_rate = tf.tile(tf.reshape(tf.pow(gamma, tf.range(0, n_step_i, dtype=tf.float32)), [1,-1]), [batch_size_ph, 1])
@@ -528,10 +418,8 @@ def ddpg_n_step_new(env_name, render_env=False,
         # whole n-step backup
         backup_tmp = tf.stop_gradient(n_step_first_rew + n_step_offline_acc_rew + boots_q)
         # Separately save for logging
-        dis_acc_first.append(n_step_first_rew)
-        dis_acc_following.append(n_step_offline_acc_rew)
-        dis_boots.append(boots_q)
-        backups.append(backup_tmp)
+        dis_acc_first.append(n_step_first_rew), dis_acc_following.append(n_step_offline_acc_rew)
+        dis_boots.append(boots_q), backups.append(backup_tmp)
 
     # Define different backup methods
     backup_avg_n_step = tf.stop_gradient(tf.reduce_mean(tf.stack(backups, axis=1), axis=1))
@@ -603,16 +491,11 @@ def ddpg_n_step_new(env_name, render_env=False,
             logger.store(TestEpRet=ep_ret, TestEpLen=ep_len)
 
     start_time = time.time()
+    # For PyBulletGym  envs, must call env.render() before env.reset().
+    if render_env:
+        env.render()
     o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
-    if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
-        o_sim_state = env.env._p.saveState()
-    else:
-        o_sim_state = env.sim.get_state()  # MuJuco
-
-    old_ep_ret = 0
-    max_ep_ret = 0
-    ep_ret_history = deque(maxlen=5)
-
+    o_sim_state, o_elapsed_steps = get_sim_state_and_elapsed_steps(env, env_name)
     total_steps = steps_per_epoch * epochs
 
     # Main loop: collect experience in env and update/log each epoch
@@ -632,11 +515,7 @@ def ddpg_n_step_new(env_name, render_env=False,
         if render_env:
             env.render()
         o2, r, d, _ = env.step(a)
-
-        if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
-            o2_sim_state = env.env._p.saveState()
-        else:
-            o2_sim_state = env.sim.get_state()  # MuJuco
+        o2_sim_state, o2_elapsed_steps = get_sim_state_and_elapsed_steps(env, env_name)
 
         ep_ret += r
         ep_len += 1
@@ -647,12 +526,12 @@ def ddpg_n_step_new(env_name, render_env=False,
         d = False if ep_len==max_ep_len else d
 
         # Store experience to replay buffer
-        replay_buffer.store(o, o_sim_state, a, r, o2, o2_sim_state, d)
+        replay_buffer.store(o, o_sim_state, o_elapsed_steps, a, r,
+                            o2, o2_sim_state, o2_elapsed_steps, d)
 
         # Super critical, easy to overlook step: make sure to update 
         # most recent observation!
-        o = o2
-        o_sim_state = o2_sim_state
+        o, o_sim_state, o_elapsed_steps = o2, o2_sim_state, o2_elapsed_steps
 
         if without_delay_train:
             # batch = replay_buffer.sample_batch(batch_size)
@@ -663,8 +542,7 @@ def ddpg_n_step_new(env_name, render_env=False,
                          r_ph: batch['rews'],
                          d_ph: batch['done'],
                          n_step_ph: n_step,
-                         batch_size_ph:batch_size
-                         }
+                         batch_size_ph:batch_size}
 
             # Q-learning update
             outs = sess.run([q_loss, q, train_q_op], feed_dict)
@@ -730,10 +608,7 @@ def ddpg_n_step_new(env_name, render_env=False,
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
-            if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
-                o_sim_state = env.env._p.saveState()
-            else:
-                o_sim_state = env.sim.get_state()  # MuJuco
+            o_sim_state, o_elapsed_steps = get_sim_state_and_elapsed_steps(env, env_name)
 
         # End of epoch wrap-up
         if t > 0 and t % steps_per_epoch == 0:
@@ -787,7 +662,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=200)
-    parser.add_argument('--save_freq', type=int, default=10)
+    parser.add_argument('--save_freq', type=int, default=20)
     parser.add_argument('--steps_per_epoch', type=int, default=5000)
     parser.add_argument('--start_steps', type=int, default=10000)
     parser.add_argument('--n_step', type=int, default=5)
@@ -796,19 +671,12 @@ if __name__ == '__main__':
                                  '1_step', '2_step', '3_step', '4_step', '5_step',
                                  '6_step', '7_step', '8_step', '9_step', '10_step'],
                         default='avg_n_step')
-    parser.add_argument('--exp_batch_size', type=int, default=10)
+    parser.add_argument('--exp_batch_size', type=int, default=10, help='batch size for logging expansion of policy')
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--replay_size', type=int, default=int(1e6))
     parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--exp_name', type=str, default='ddpg_n_step_new')
-    parser.add_argument('--hardcopy_target_nn', action="store_true", help='Target network update method: hard copy')
     parser.add_argument('--act_noise',type=float, default=0.1)
-    parser.add_argument("--exploration-strategy", type=str, choices=["action_noise", "epsilon_greedy"],
-                        default='epsilon_greedy', help='action_noise or epsilon_greedy')
-    parser.add_argument("--epsilon-max", type=float, default=1.0, help='maximum of epsilon')
-    parser.add_argument("--epsilon-min", type=float, default=.01, help='minimum of epsilon')
-    parser.add_argument("--epsilon-decay", type=float, default=.001, help='epsilon decay')
-
     parser.add_argument("--data_dir", type=str, default='spinup_data')
 
     args = parser.parse_args()
@@ -818,9 +686,6 @@ if __name__ == '__main__':
     data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
                         args.data_dir)
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
-
-    # if args.hardcopy_target_nn:
-    #     polyak = 0
 
     ddpg_n_step_new(env_name=args.env, render_env=args.render_env,
                     actor_hidden_layers=args.actor_hidden_layers,
