@@ -6,7 +6,6 @@ import gym
 import time
 from spinup.algos.ddpg_n_step_new.core import MLP
 from spinup.utils.logx import EpochLogger
-from collections import deque
 import os.path as osp
 import os
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -146,13 +145,15 @@ def restore_simulation_state(env, env_name, res_sim_state, res_obs, res_ela_step
         env.sim.set_state(res_sim_state)  # MuJuco
         env.sim.forward()
         obs_after_restore = env.env._get_obs()
+        # state_after_restore = env.sim.get_state()
 
-    # examine if restore is correct.
-    allowed_obs_err = 1e-4
-    if (abs(res_obs - obs_after_restore) > allowed_obs_err).any():
-        raise Exception('Restore state fail in online_expand_first_n_step!')
-    else:
-        return env
+    # # examine if restore is correct.
+    # allowed_obs_err = 1e-4
+    # if (abs(res_obs - obs_after_restore) > allowed_obs_err).any():
+    #     import pdb; pdb.set_trace()
+    #     raise Exception('Restore state fail in online_expand_first_n_step!')
+
+    return env
 
 def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
                          env_name, env,
@@ -343,8 +344,7 @@ def ddpg_n_step_new(env_name, render_env=False,
     logger = EpochLogger(**logger_kwargs)
     logger.save_config(locals())
 
-    # tf.set_random_seed(seed)
-    tf.random.set_seed(seed)
+    tf.set_random_seed(seed)
     np.random.seed(seed)
 
     env, test_env = gym.make(env_name), gym.make(env_name)
