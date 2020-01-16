@@ -4,12 +4,15 @@ import pandas as pd
 import pybulletgym
 import gym
 import time
-from spinup.algos.ddpg_n_step_new.core import MLP
+from spinup.algos.ddpg_n_step_new_dev.core import MLP
 from spinup.utils.logx import EpochLogger
+from multiprocessing import Pool
 import os.path as osp
 import os
+
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
 
 class ReplayBuffer:
     """
@@ -41,8 +44,8 @@ class ReplayBuffer:
         self.acts_buf[self.ptr] = act
         self.rews_buf[self.ptr] = rew
         self.done_buf[self.ptr] = done
-        self.ptr = (self.ptr+1) % self.max_size
-        self.size = min(self.size+1, self.max_size)
+        self.ptr = (self.ptr + 1) % self.max_size
+        self.size = min(self.size + 1, self.max_size)
 
     def sample_batch(self, batch_size=32):
         idxs = np.random.randint(0, self.size, size=batch_size)
@@ -64,7 +67,7 @@ class ReplayBuffer:
             'rews': batch_size x n_step
             'done': batch_size x n_step
         """
-        idxs = np.random.randint(0, self.size-(n_step-1), size=batch_size)
+        idxs = np.random.randint(0, self.size - (n_step - 1), size=batch_size)
         batch_obs1 = np.zeros([batch_size, n_step, self.obs_dim])
         batch_obs2 = np.zeros([batch_size, n_step, self.obs_dim])
         batch_obs1_sim_state = []
@@ -76,7 +79,7 @@ class ReplayBuffer:
         batch_rews_potential = np.zeros([batch_size, n_step])
         batch_done = np.zeros([batch_size, n_step])
         for i in range(n_step):
-            batch_obs1[:, i, :] = self.obs1_buf[idxs+i]
+            batch_obs1[:, i, :] = self.obs1_buf[idxs + i]
             batch_obs2[:, i, :] = self.obs2_buf[idxs + i]
             batch_obs1_ela_steps[:, i] = self.obs1_ela_steps[idxs + i]
             batch_obs2_ela_steps[:, i] = self.obs2_ela_steps[idxs + i]
@@ -87,15 +90,16 @@ class ReplayBuffer:
         # Simulation state corresponds to obs2 for restoring
         for i in idxs:
             batch_obs1_sim_state.append([self.obs1_sim_state_buf[i + s_i] for s_i in range(n_step)])
-            batch_obs2_sim_state.append([self.obs2_sim_state_buf[i+s_i] for s_i in range(n_step)])
+            batch_obs2_sim_state.append([self.obs2_sim_state_buf[i + s_i] for s_i in range(n_step)])
 
         # Set all done after the fist met one to 1
-        done_index = np.asarray(np.where(batch_done==1))
+        done_index = np.asarray(np.where(batch_done == 1))
         for d_i in range(done_index.shape[1]):
-            x, y=done_index[:, d_i]
+            x, y = done_index[:, d_i]
             batch_done[x, y:] = 1
         if debug:
-            import pdb; pdb.set_trace()
+            import pdb;
+            pdb.set_trace()
 
         batch_done = np.hstack((np.zeros((batch_size, 1)), batch_done))
         return dict(obs1=batch_obs1[:, 0, :],
@@ -109,20 +113,70 @@ class ReplayBuffer:
                     rews_potential=batch_rews_potential,
                     done=batch_done)
 
+
+def pybulletenv_get_state(env):
+    """
+    Function used to get state information from PyBullet physics engine.
+    :param env:
+    :return:
+    """
+    body_num = env.env._p.getNumBodies()
+    # body_info = [env.env._p.getBodyInfo(body_i) for body_i in range(body_num)]
+    floor_id, robot_id = 0, 1
+
+    robot_base_pos_ori = env.env._p.getBasePositionAndOrientation(robot_id)
+    robot_base_vel = env.env._p.getBaseVelocity(robot_id)
+
+    joint_num = env.env._p.getNumJoints(robot_id)
+    joint_state = []
+    for joint_i in range(joint_num):
+        joint_state.append(env.env._p.getJointState(robot_id, joint_i))
+
+    state = {'body_num': body_num,
+             'robot_base_pos_ori': robot_base_pos_ori, 'robot_base_vel': robot_base_vel,
+             'joint_num': joint_num, 'joint_state': joint_state}
+    return state
+
+
+def pybulletenv_set_state(env, state):
+    """
+    Function used to set state in PyBullet physics engine.
+    :param env:
+    :param state:
+    :return:
+    """
+
+    body_num = env.env._p.getNumBodies()
+    floor_id, robot_id = 0, 1
+    joint_num = env.env._p.getNumJoints(robot_id)
+    if body_num != state['body_num'] and joint_num != state['body_num']:
+        print('Set state error.')
+    # restore state
+    env.env._p.resetBasePositionAndOrientation(robot_id,
+                                               state['robot_base_pos_ori'][0],
+                                               state['robot_base_pos_ori'][1])
+    env.env._p.resetBaseVelocity(robot_id, state['robot_base_vel'][0], state['robot_base_vel'][1])
+    for j_i, j_s in enumerate(state['joint_state']):
+        env.env._p.resetJointState(robot_id, j_i, j_s[0], j_s[1])
+    return env
+
+
 def get_sim_state_and_elapsed_steps(env, env_name):
     if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
-        o_sim_state = env.env._p.saveState()
+        # o_sim_state = env.env._p.saveState()
+        o_sim_state = pybulletenv_get_state(env)
     else:
         o_sim_state = env.sim.get_state()  # MuJuco
     o_elapsed_steps = env._elapsed_steps
     return o_sim_state, o_elapsed_steps
+
 
 def restore_simulation_state(env, env_name, res_sim_state, res_obs, res_ela_steps):
     """
     Function used to restore simulation state.
     """
     # restore simulator state
-    _ = env.reset()     # (crucial to reset env._elapsed_steps)
+    _ = env.reset()  # (crucial to reset env._elapsed_steps)
     env._elapsed_steps = res_ela_steps  # Crucial to reset elapsed step in simulator
     if 'PyBulletEnv' in env_name or 'MuJoCoEnv' in env_name:
         # env.robot.feet_contact is calculated in env.step(), so we need to reset it after restore joints and position.
@@ -131,7 +185,7 @@ def restore_simulation_state(env, env_name, res_sim_state, res_obs, res_ela_step
         # 2. restore feet_contact
         # 3. call env.robot.calc_state() to prepare walk_target_dist for env.robot.calc_potential()
         # 4. restore potential (used to calculate progress but only updated when calling env.step())
-        env.env._p.restoreState(res_sim_state)  # Use env.env._p.getContactPoints() to see contact point info.
+        env = pybulletenv_set_state(env, res_sim_state)
         env.robot.feet_contact = res_obs[-len(env.robot.feet):].copy()
         # Crucial call sequence: 1. calc_state() 2. calc_potential()
         #   (as calc_potential() needs walk_target_dist which is calculated in calc_state() which further depends on state.)
@@ -150,10 +204,12 @@ def restore_simulation_state(env, env_name, res_sim_state, res_obs, res_ela_step
     # # examine if restore is correct.
     # allowed_obs_err = 1e-4
     # if (abs(res_obs - obs_after_restore) > allowed_obs_err).any():
-    #     import pdb; pdb.set_trace()
+    #     import pdb;
+    #     pdb.set_trace()
     #     raise Exception('Restore state fail in online_expand_first_n_step!')
 
     return env
+
 
 def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
                          env_name, env,
@@ -174,7 +230,7 @@ def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
         env = restore_simulation_state(env, env_name, res_sim_state, res_obs, res_ela_steps)
 
         # expand until termination
-        exp_o2 = exp_batch['obs2'][exp_b_i, exp_n_step, :].copy()    # np.copy() to copy array, otherwise copy reference
+        exp_o2 = exp_batch['obs2'][exp_b_i, exp_n_step, :].copy()  # np.copy() to copy array, otherwise copy reference
         exp_done = exp_batch['done'][exp_b_i, exp_n_step + 1].copy()
         exp_dis_r = 0
         step = 0
@@ -191,8 +247,9 @@ def online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
     # exp_n_step from replay buffer
     dis_r_n_step = np.tile(np.asarray([gamma ** i for i in range(exp_n_step + 1)]).reshape([1, -1]),
                            [exp_batch_size, 1])
-    dis_acc_n_step = np.sum(np.multiply(dis_r_n_step, exp_batch['rews'][:, :exp_n_step+1].reshape([exp_batch_size, -1])),
-                            axis=1)
+    dis_acc_n_step = np.sum(
+        np.multiply(dis_r_n_step, exp_batch['rews'][:, :exp_n_step + 1].reshape([exp_batch_size, -1])),
+        axis=1)
     ground_truth_q = dis_acc_n_step + gamma ** (exp_n_step + 1) * dis_acc_rew
     # Prediction
     predicted_q = sess.run(q, feed_dict={x_ph: exp_batch['obs1'], a_ph: exp_batch['acts']})
@@ -224,18 +281,17 @@ def online_expand_first_n_step(sess, pi, backups, dis_acc_first, dis_acc_followi
 
         # expand n-1 steps following 1st step
         o2 = exp_next_obs[exp_b_i, 0, :].copy()
-        done = exp_done[exp_b_i, 1].copy() # the 1st done is only used to calculate accumulated reward
+        done = exp_done[exp_b_i, 1].copy()  # the 1st done is only used to calculate accumulated reward
 
-        for s_i in range(n_step-1): # the following n-1 steps
+        for s_i in range(n_step - 1):  # the following n-1 steps
             if done:
                 break
             else:
                 o2, r, done, _ = env.step(sess.run(pi, feed_dict={x_ph: o2.reshape(1, -1)})[0])
-                exp_next_obs[exp_b_i, 1+s_i, :] = o2
-                exp_rew[exp_b_i, 1+s_i] = r
-                exp_done[exp_b_i, 2+s_i] = done
+                exp_next_obs[exp_b_i, 1 + s_i, :] = o2
+                exp_rew[exp_b_i, 1 + s_i] = r
+                exp_done[exp_b_i, 2 + s_i] = done
 
-    # set elements after first done=1 to 1
     done_index = np.asarray(np.where(exp_done == 1))
     for d_i in range(done_index.shape[1]):
         x, y = done_index[:, d_i]
@@ -255,22 +311,28 @@ def online_expand_first_n_step(sess, pi, backups, dis_acc_first, dis_acc_followi
                                                                        r_ph: exp_batch['rews'],
                                                                        d_ph: exp_batch['done'],
                                                                        batch_size_ph: exp_batch_size})
-    if (exp_second > 200).any():
-        import pdb; pdb.set_trace()
+    # if (exp_second > 200).any():
+    #     import pdb;
+    #     pdb.set_trace()
     return exp_backup, exp_first, exp_second, exp_third, \
            n_s_backup, n_s_first, n_s_second, n_s_third
+
 
 """
 
 Deep Deterministic Policy Gradient (DDPG)
 
 """
+
+
 def ddpg_n_step_new(env_name, render_env=False,
                     actor_hidden_layers=[300, 300], critic_hidden_layers=[300, 300],
                     seed=0,
                     steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99,
                     n_step=1, backup_method='mixed_n_step', exp_batch_size=10,
                     without_delay_train=False,
+                    log_n_step_offline_and_online_expansion=False,
+                    log_n_step_online_expansion_and_boostrapping=False,
                     polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000,
                     act_noise=0.1, policy_delay=2, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
@@ -279,8 +341,8 @@ def ddpg_n_step_new(env_name, render_env=False,
         env_fn : A function which creates a copy of the environment.
             The environment must satisfy the OpenAI Gym API.
 
-        actor_critic: A function which takes in placeholder symbols 
-            for state, ``x_ph``, and action, ``a_ph``, and returns the main 
+        actor_critic: A function which takes in placeholder symbols
+            for state, ``x_ph``, and action, ``a_ph``, and returns the main
             outputs from the agent's Tensorflow computation graph:
 
             ===========  ================  ======================================
@@ -288,20 +350,20 @@ def ddpg_n_step_new(env_name, render_env=False,
             ===========  ================  ======================================
             ``pi``       (batch, act_dim)  | Deterministically computes actions
                                            | from policy given states.
-            ``q``        (batch,)          | Gives the current estimate of Q* for 
+            ``q``        (batch,)          | Gives the current estimate of Q* for
                                            | states in ``x_ph`` and actions in
                                            | ``a_ph``.
-            ``q_pi``     (batch,)          | Gives the composition of ``q`` and 
-                                           | ``pi`` for states in ``x_ph``: 
+            ``q_pi``     (batch,)          | Gives the composition of ``q`` and
+                                           | ``pi`` for states in ``x_ph``:
                                            | q(x, pi(x)).
             ===========  ================  ======================================
 
-        ac_kwargs (dict): Any kwargs appropriate for the actor_critic 
+        ac_kwargs (dict): Any kwargs appropriate for the actor_critic
             function you provided to DDPG.
 
         seed (int): Seed for random number generators.
 
-        steps_per_epoch (int): Number of steps of interaction (state-action pairs) 
+        steps_per_epoch (int): Number of steps of interaction (state-action pairs)
             for the agent and the environment in each epoch.
 
         epochs (int): Number of epochs to run and train agent.
@@ -310,14 +372,14 @@ def ddpg_n_step_new(env_name, render_env=False,
 
         gamma (float): Discount factor. (Always between 0 and 1.)
 
-        polyak (float): Interpolation factor in polyak averaging for target 
-            networks. Target networks are updated towards main networks 
+        polyak (float): Interpolation factor in polyak averaging for target
+            networks. Target networks are updated towards main networks
             according to:
 
-            .. math:: \\theta_{\\text{targ}} \\leftarrow 
+            .. math:: \\theta_{\\text{targ}} \\leftarrow
                 \\rho \\theta_{\\text{targ}} + (1-\\rho) \\theta
 
-            where :math:`\\rho` is polyak. (Always between 0 and 1, usually 
+            where :math:`\\rho` is polyak. (Always between 0 and 1, usually
             close to 1.)
 
         pi_lr (float): Learning rate for policy.
@@ -329,7 +391,7 @@ def ddpg_n_step_new(env_name, render_env=False,
         start_steps (int): Number of steps for uniform-random action selection,
             before running real policy. Helps exploration.
 
-        act_noise (float): Stddev for Gaussian exploration noise added to 
+        act_noise (float): Stddev for Gaussian exploration noise added to
             policy at training time. (At test time, no noise is added.)
 
         max_ep_len (int): Maximum length of trajectory / episode / rollout.
@@ -392,7 +454,8 @@ def ddpg_n_step_new(env_name, render_env=False,
     n_step_bootstrapped_q = []
     for n_step_i in range(n_step):
         # slice next_obs for different n
-        next_obs_tmp = tf.reshape(tf.slice(x2_ph, [0, n_step_i, 0], [batch_size_ph, 1, obs_dim]), [batch_size_ph, obs_dim])
+        next_obs_tmp = tf.reshape(tf.slice(x2_ph, [0, n_step_i, 0], [batch_size_ph, 1, obs_dim]),
+                                  [batch_size_ph, obs_dim])
         pi_targ_tmp = act_limit * actor_targ(next_obs_tmp)
         q_pi_targ = tf.squeeze(critic_targ(tf.concat([next_obs_tmp, pi_targ_tmp], axis=-1)), axis=1)
         n_step_bootstrapped_q.append(q_pi_targ)
@@ -402,10 +465,11 @@ def ddpg_n_step_new(env_name, render_env=False,
 
     # Bellman backup for Q function
     dis_acc_first, dis_acc_following, dis_boots, backups = [], [], [], []
-    for n_step_i in range(1, n_step+1):
+    for n_step_i in range(1, n_step + 1):
         # for k = 0,..., n-1: (1-done) * gamma**(k) * reward
-        dis_rate = tf.tile(tf.reshape(tf.pow(gamma, tf.range(0, n_step_i, dtype=tf.float32)), [1,-1]), [batch_size_ph, 1])
-        dis_rate = tf.multiply(dis_rate, 1 - tf.slice(d_ph, [0, 0], [batch_size_ph, n_step_i])) # multiply done slice
+        dis_rate = tf.tile(tf.reshape(tf.pow(gamma, tf.range(0, n_step_i, dtype=tf.float32)), [1, -1]),
+                           [batch_size_ph, 1])
+        dis_rate = tf.multiply(dis_rate, 1 - tf.slice(d_ph, [0, 0], [batch_size_ph, n_step_i]))  # multiply done slice
         n_step_dis_rew = tf.multiply(dis_rate, tf.slice(r_ph, [0, 0], [batch_size_ph, n_step_i]))
         # first step reward
         n_step_first_rew = n_step_dis_rew[:, 0]
@@ -414,7 +478,7 @@ def ddpg_n_step_new(env_name, render_env=False,
         n_step_offline_acc_rew = tf.reduce_sum(n_step_dis_rew, axis=1)
         # discounted bootstrapped reward
         boots_q = gamma ** n_step_i * (1 - tf.reshape(tf.slice(d_ph, [0, n_step_i], [batch_size_ph, 1]), [-1])) * \
-        n_step_bootstrapped_q[n_step_i - 1]
+                  n_step_bootstrapped_q[n_step_i - 1]
         # whole n-step backup
         backup_tmp = tf.stop_gradient(n_step_first_rew + n_step_offline_acc_rew + boots_q)
         # Separately save for logging
@@ -436,13 +500,13 @@ def ddpg_n_step_new(env_name, render_env=False,
         tmp_step, _ = backup_method.split('_')
         tmp_step = int(tmp_step)
         if 1 <= tmp_step and tmp_step <= n_step:
-            backup = backups[tmp_step-1]
+            backup = backups[tmp_step - 1]
         else:
             raise Exception('Wrong backup_method!')
 
     # DDPG losses
     pi_loss = -tf.reduce_mean(q_pi)
-    q_loss = tf.reduce_mean((q-backup)**2)
+    q_loss = tf.reduce_mean((q - backup) ** 2)
 
     # Separate train ops for pi, q
     pi_optimizer = tf.train.AdamOptimizer(learning_rate=pi_lr)
@@ -452,9 +516,9 @@ def ddpg_n_step_new(env_name, render_env=False,
     train_q_op = q_optimizer.minimize(loss=q_loss, var_list=critic.variables)
 
     # Polyak averaging for target variables
-    target_update = tf.group([tf.assign(v_targ, polyak*v_targ + (1-polyak)*v_main)
-                              for v_main, v_targ in zip(actor.variables+critic.variables,
-                                                        actor_targ.variables+critic_targ.variables)])
+    target_update = tf.group([tf.assign(v_targ, polyak * v_targ + (1 - polyak) * v_main)
+                              for v_main, v_targ in zip(actor.variables + critic.variables,
+                                                        actor_targ.variables + critic_targ.variables)])
 
     # Initializing targets to match main variables
     target_init = tf.group([tf.assign(v_targ, v_main)
@@ -476,14 +540,14 @@ def ddpg_n_step_new(env_name, render_env=False,
         sess.run(target_init)
 
     def get_action(o, noise_scale):
-        a = sess.run(pi, feed_dict={x_ph: o.reshape(1,-1)})[0]
+        a = sess.run(pi, feed_dict={x_ph: o.reshape(1, -1)})[0]
         a += noise_scale * np.random.randn(act_dim)
         return np.clip(a, -act_limit, act_limit)
 
     def test_agent(n=10):
         for j in range(n):
             o, r, d, ep_ret, ep_len = test_env.reset(), 0, False, 0, 0
-            while not(d or (ep_len == max_ep_len)):
+            while not (d or (ep_len == max_ep_len)):
                 # Take deterministic actions at test time (noise_scale=0)
                 o, r, d, _ = test_env.step(get_action(o, 0))
                 ep_ret += r
@@ -523,13 +587,13 @@ def ddpg_n_step_new(env_name, render_env=False,
         # Ignore the "done" signal if it comes from hitting the time
         # horizon (that is, when it's an artificial terminal signal
         # that isn't based on the agent's state)
-        d = False if ep_len==max_ep_len else d
+        d = False if ep_len == max_ep_len else d
 
         # Store experience to replay buffer
         replay_buffer.store(o, o_sim_state, o_elapsed_steps, a, r,
                             o2, o2_sim_state, o2_elapsed_steps, d)
 
-        # Super critical, easy to overlook step: make sure to update 
+        # Super critical, easy to overlook step: make sure to update
         # most recent observation!
         o, o_sim_state, o_elapsed_steps = o2, o2_sim_state, o2_elapsed_steps
 
@@ -542,7 +606,7 @@ def ddpg_n_step_new(env_name, render_env=False,
                          r_ph: batch['rews'],
                          d_ph: batch['done'],
                          n_step_ph: n_step,
-                         batch_size_ph:batch_size}
+                         batch_size_ph: batch_size}
 
             # Q-learning update
             outs = sess.run([q_loss, q, train_q_op], feed_dict)
@@ -575,7 +639,7 @@ def ddpg_n_step_new(env_name, render_env=False,
                     outs = sess.run([q_loss, q, backups, backup_avg_n_step, backup_min_n_step, train_q_op], feed_dict)
                     logger.store(LossQ=outs[0], QVals=outs[1])
                     logger.store(
-                        **{'QBackup{}Step'.format(n_step_i+1): outs[2][n_step_i] for n_step_i in range(n_step)})
+                        **{'QBackup{}Step'.format(n_step_i + 1): outs[2][n_step_i] for n_step_i in range(n_step)})
                     logger.store(QBackupAvgNStep=outs[3], QBackupMinNStep=outs[4])
                     # actor update
                     outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
@@ -583,25 +647,35 @@ def ddpg_n_step_new(env_name, render_env=False,
             """
             ###############################################
             """
-            # Logging: n-step offline + online expansion
-            exp_after_n_step = 0  # indicates expand based on online policy after observing exp_n_step offline experiences
-            ground_truth_q, predicted_q = online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
-                                                               env_name, env,
-                                                               replay_buffer, n_step, exp_batch_size, exp_after_n_step)
-            logger.store(PredictedQ=predicted_q, GroundTruthQ=ground_truth_q)
+            if log_n_step_offline_and_online_expansion:
+                # Logging: n-step offline + online expansion
+                # start_time_1 = time.time()
+                exp_after_n_step = 0  # indicates expand based on online policy after observing exp_n_step offline experiences
+                ground_truth_q, predicted_q = online_expand_to_end(sess, q, pi, x_ph, a_ph, gamma,
+                                                                   env_name, env,
+                                                                   replay_buffer, n_step, exp_batch_size,
+                                                                   exp_after_n_step)
+                logger.store(PredictedQ=predicted_q, GroundTruthQ=ground_truth_q)
+                # end_time_1 = time.time()
+            if log_n_step_online_expansion_and_boostrapping:
+                # Logging: n-step online expansion + bootstrapped Q thereafter
+                # start_time_2 = time.time()
+                exp_backup, exp_first, exp_second, exp_third, \
+                n_s_backup, n_s_first, n_s_second, n_s_third = online_expand_first_n_step(sess, pi,
+                                                                                          backups, dis_acc_first,
+                                                                                          dis_acc_following, dis_boots,
+                                                                                          x_ph, x2_ph, r_ph, d_ph,
+                                                                                          batch_size_ph,
+                                                                                          env_name, env,
+                                                                                          replay_buffer, n_step,
+                                                                                          exp_batch_size)
 
-            # Logging: n-step online expansion + bootstrapped Q thereafter
-            exp_backup, exp_first, exp_second, exp_third, \
-            n_s_backup, n_s_first, n_s_second, n_s_third = online_expand_first_n_step(sess, pi,
-                                                                                     backups, dis_acc_first, dis_acc_following, dis_boots,
-                                                                                     x_ph, x2_ph, r_ph, d_ph, batch_size_ph,
-                                                                                     env_name, env,
-                                                                                     replay_buffer, n_step, exp_batch_size)
-
-            logger.store(NStepOfflineBackup=n_s_backup, NStepOfflineFir=n_s_first,
-                         NStepOfflineSec=n_s_second, NStepOfflineThi=n_s_third,
-                         NStepOnlineBackup=exp_backup, NStepOnlineFir=exp_first,
-                         NStepOnlineSec=exp_second, NStepOnlineThi=exp_third)
+                logger.store(NStepOfflineBackup=n_s_backup, NStepOfflineFir=n_s_first,
+                             NStepOfflineSec=n_s_second, NStepOfflineThi=n_s_third,
+                             NStepOnlineBackup=exp_backup, NStepOnlineFir=exp_first,
+                             NStepOnlineSec=exp_second, NStepOnlineThi=exp_third)
+                # end_time_2 = time.time()
+                # print('Method 1: {}, Method 2:{}'.format(end_time_1 - start_time_1, end_time_2-start_time_2))
             """
             ###############################################
             """
@@ -615,7 +689,7 @@ def ddpg_n_step_new(env_name, render_env=False,
             epoch = t // steps_per_epoch
 
             # Save actor-critic model
-            if (epoch % save_freq == 0) or (epoch == epochs-1):
+            if (epoch % save_freq == 0) or (epoch == epochs - 1):
                 model_save_dir = os.path.join(logger.output_dir, 'checkpoints')
                 if not os.path.exists(model_save_dir):
                     os.makedirs(model_save_dir)
@@ -636,24 +710,28 @@ def ddpg_n_step_new(env_name, render_env=False,
             logger.log_tabular('LossPi', average_only=True)
             logger.log_tabular('LossQ', average_only=True)
             for n_step_i in range(n_step):
-                logger.log_tabular('QBackup{}Step'.format(n_step_i+1), with_min_and_max=True)
+                logger.log_tabular('QBackup{}Step'.format(n_step_i + 1), with_min_and_max=True)
             logger.log_tabular('QBackupAvgNStep', with_min_and_max=True)
             logger.log_tabular('QBackupMinNStep', with_min_and_max=True)
-            logger.log_tabular('PredictedQ', with_min_and_max=True)
-            logger.log_tabular('GroundTruthQ', with_min_and_max=True)
-            logger.log_tabular('NStepOfflineBackup', with_min_and_max=True)
-            logger.log_tabular('NStepOnlineBackup', with_min_and_max=True)
-            logger.log_tabular('NStepOfflineFir', with_min_and_max=True)
-            logger.log_tabular('NStepOnlineFir', with_min_and_max=True)
-            logger.log_tabular('NStepOfflineSec', with_min_and_max=True)
-            logger.log_tabular('NStepOnlineSec', with_min_and_max=True)
-            logger.log_tabular('NStepOfflineThi', with_min_and_max=True)
-            logger.log_tabular('NStepOnlineThi', with_min_and_max=True)
-            logger.log_tabular('Time', time.time()-start_time)
+            if log_n_step_offline_and_online_expansion:
+                logger.log_tabular('PredictedQ', with_min_and_max=True)
+                logger.log_tabular('GroundTruthQ', with_min_and_max=True)
+            if log_n_step_online_expansion_and_boostrapping:
+                logger.log_tabular('NStepOfflineBackup', with_min_and_max=True)
+                logger.log_tabular('NStepOnlineBackup', with_min_and_max=True)
+                logger.log_tabular('NStepOfflineFir', with_min_and_max=True)
+                logger.log_tabular('NStepOnlineFir', with_min_and_max=True)
+                logger.log_tabular('NStepOfflineSec', with_min_and_max=True)
+                logger.log_tabular('NStepOnlineSec', with_min_and_max=True)
+                logger.log_tabular('NStepOfflineThi', with_min_and_max=True)
+                logger.log_tabular('NStepOnlineThi', with_min_and_max=True)
+            logger.log_tabular('Time', time.time() - start_time)
             logger.dump_tabular()
+
 
 if __name__ == '__main__':
     import argparse
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='HalfCheetah-v2')
     parser.add_argument('--render_env', action="store_true")
@@ -675,14 +753,19 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--replay_size', type=int, default=int(1e6))
     parser.add_argument('--without_delay_train', action='store_true')
+
+    parser.add_argument('--log_n_step_offline_and_online_expansion', action='store_true')
+    parser.add_argument('--log_n_step_online_expansion_and_boostrapping', action='store_true')
+
     parser.add_argument('--exp_name', type=str, default='ddpg_n_step_new')
-    parser.add_argument('--act_noise',type=float, default=0.1)
+    parser.add_argument('--act_noise', type=float, default=0.1)
     parser.add_argument("--data_dir", type=str, default='spinup_data')
 
     args = parser.parse_args()
 
     # Set log data saving directory
     from spinup.utils.run_utils import setup_logger_kwargs
+
     data_dir = osp.join(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.dirname(osp.abspath(__file__)))))),
                         args.data_dir)
     logger_kwargs = setup_logger_kwargs(args.exp_name, args.seed, data_dir, datestamp=True)
@@ -691,10 +774,12 @@ if __name__ == '__main__':
                     actor_hidden_layers=args.actor_hidden_layers,
                     critic_hidden_layers=args.critic_hidden_layers,
                     act_noise=args.act_noise,
-                    gamma=args.gamma, seed=args.seed,replay_size=args.replay_size,
+                    gamma=args.gamma, seed=args.seed, replay_size=args.replay_size,
                     n_step=args.n_step, backup_method=args.backup_method,
                     exp_batch_size=args.exp_batch_size,
                     without_delay_train=args.without_delay_train,
+                    log_n_step_offline_and_online_expansion=args.log_n_step_offline_and_online_expansion,
+                    log_n_step_online_expansion_and_boostrapping=args.log_n_step_online_expansion_and_boostrapping,
                     epochs=args.epochs, save_freq=args.save_freq,
                     batch_size=args.batch_size,
                     steps_per_epoch=args.steps_per_epoch, start_steps=args.start_steps,
