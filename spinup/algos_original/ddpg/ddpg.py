@@ -45,7 +45,8 @@ Deep Deterministic Policy Gradient (DDPG)
 
 """
 def ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0, 
-         steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, 
+         steps_per_epoch=5000, epochs=100, without_delay_train=False,
+         replay_size=int(1e6), gamma=0.99,
          polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000, 
          act_noise=0.1, max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
     """
@@ -229,27 +230,45 @@ def ddpg(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         # most recent observation!
         o = o2
 
+        if without_delay_train:
+            batch = replay_buffer.sample_batch(batch_size)
+            feed_dict = {x_ph: batch['obs1'],
+                         x2_ph: batch['obs2'],
+                         a_ph: batch['acts'],
+                         r_ph: batch['rews'],
+                         d_ph: batch['done']
+                         }
+
+            # Q-learning update
+            outs = sess.run([q_loss, q, train_q_op], feed_dict)
+            logger.store(LossQ=outs[0], QVals=outs[1])
+
+            # Policy update
+            outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+            logger.store(LossPi=outs[0])
+
         if d or (ep_len == max_ep_len):
             """
             Perform all DDPG updates at the end of the trajectory,
             in accordance with tuning done by TD3 paper authors.
             """
-            for _ in range(ep_len):
-                batch = replay_buffer.sample_batch(batch_size)
-                feed_dict = {x_ph: batch['obs1'],
-                             x2_ph: batch['obs2'],
-                             a_ph: batch['acts'],
-                             r_ph: batch['rews'],
-                             d_ph: batch['done']
-                            }
+            if not without_delay_train:
+                for _ in range(ep_len):
+                    batch = replay_buffer.sample_batch(batch_size)
+                    feed_dict = {x_ph: batch['obs1'],
+                                 x2_ph: batch['obs2'],
+                                 a_ph: batch['acts'],
+                                 r_ph: batch['rews'],
+                                 d_ph: batch['done']
+                                }
 
-                # Q-learning update
-                outs = sess.run([q_loss, q, train_q_op], feed_dict)
-                logger.store(LossQ=outs[0], QVals=outs[1])
+                    # Q-learning update
+                    outs = sess.run([q_loss, q, train_q_op], feed_dict)
+                    logger.store(LossQ=outs[0], QVals=outs[1])
 
-                # Policy update
-                outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
-                logger.store(LossPi=outs[0])
+                    # Policy update
+                    outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+                    logger.store(LossPi=outs[0])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -287,6 +306,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--exp_name', type=str, default='ddpg')
     parser.add_argument('--data_dir', type=str, default='spinup_data')
     args = parser.parse_args()
@@ -301,4 +321,5 @@ if __name__ == '__main__':
     ddpg(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
          ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
          gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+         without_delay_train=args.without_delay_train,
          logger_kwargs=logger_kwargs)

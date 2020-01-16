@@ -45,7 +45,8 @@ TD3 (Twin Delayed DDPG)
 
 """
 def td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0, 
-        steps_per_epoch=5000, epochs=100, replay_size=int(1e6), gamma=0.99, 
+        steps_per_epoch=5000, epochs=100, without_delay_train=False,
+        replay_size=int(1e6), gamma=0.99,
         polyak=0.995, pi_lr=1e-3, q_lr=1e-3, batch_size=100, start_steps=10000, 
         act_noise=0.1, target_noise=0.2, noise_clip=0.5, policy_delay=2, 
         max_ep_len=1000, logger_kwargs=dict(), save_freq=1):
@@ -255,28 +256,45 @@ def td3(env_fn, actor_critic=core.mlp_actor_critic, ac_kwargs=dict(), seed=0,
         # most recent observation!
         o = o2
 
+        if without_delay_train:
+            batch = replay_buffer.sample_batch(batch_size)
+            feed_dict = {x_ph: batch['obs1'],
+                         x2_ph: batch['obs2'],
+                         a_ph: batch['acts'],
+                         r_ph: batch['rews'],
+                         d_ph: batch['done']
+                         }
+            q_step_ops = [q_loss, q1, q2, train_q_op]
+            outs = sess.run(q_step_ops, feed_dict)
+            logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2])
+
+            # Delayed policy update
+            outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+            logger.store(LossPi=outs[0])
+
         if d or (ep_len == max_ep_len):
             """
             Perform all TD3 updates at the end of the trajectory
             (in accordance with source code of TD3 published by
             original authors).
             """
-            for j in range(ep_len):
-                batch = replay_buffer.sample_batch(batch_size)
-                feed_dict = {x_ph: batch['obs1'],
-                             x2_ph: batch['obs2'],
-                             a_ph: batch['acts'],
-                             r_ph: batch['rews'],
-                             d_ph: batch['done']
-                            }
-                q_step_ops = [q_loss, q1, q2, train_q_op]
-                outs = sess.run(q_step_ops, feed_dict)
-                logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2])
+            if not without_delay_train:
+                for j in range(ep_len):
+                    batch = replay_buffer.sample_batch(batch_size)
+                    feed_dict = {x_ph: batch['obs1'],
+                                 x2_ph: batch['obs2'],
+                                 a_ph: batch['acts'],
+                                 r_ph: batch['rews'],
+                                 d_ph: batch['done']
+                                }
+                    q_step_ops = [q_loss, q1, q2, train_q_op]
+                    outs = sess.run(q_step_ops, feed_dict)
+                    logger.store(LossQ=outs[0], Q1Vals=outs[1], Q2Vals=outs[2])
 
-                if j % policy_delay == 0:
-                    # Delayed policy update
-                    outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
-                    logger.store(LossPi=outs[0])
+                    if j % policy_delay == 0:
+                        # Delayed policy update
+                        outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
+                        logger.store(LossPi=outs[0])
 
             logger.store(EpRet=ep_ret, EpLen=ep_len)
             o, r, d, ep_ret, ep_len = env.reset(), 0, False, 0, 0
@@ -315,6 +333,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', type=float, default=0.99)
     parser.add_argument('--seed', '-s', type=int, default=0)
     parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--without_delay_train', action='store_true')
     parser.add_argument('--exp_name', type=str, default='td3')
     parser.add_argument('--data_dir', type=str, default='spinup_data')
     args = parser.parse_args()
@@ -329,4 +348,5 @@ if __name__ == '__main__':
     td3(lambda : gym.make(args.env), actor_critic=core.mlp_actor_critic,
         ac_kwargs=dict(hidden_sizes=[args.hid]*args.l),
         gamma=args.gamma, seed=args.seed, epochs=args.epochs,
+        without_delay_train=args.without_delay_train,
         logger_kwargs=logger_kwargs)
