@@ -4,7 +4,7 @@ import pandas as pd
 import pybulletgym
 import gym
 import time
-from spinup.algos.ddpg_n_step_new_dev.core import MLP
+from spinup.algos.ddpg_n_step_new.core import MLP
 from spinup.utils.logx import EpochLogger
 from multiprocessing import Pool
 import os.path as osp
