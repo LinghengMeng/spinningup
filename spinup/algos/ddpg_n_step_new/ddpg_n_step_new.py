@@ -760,13 +760,13 @@ if __name__ == '__main__':
                                  '1_step', '2_step', '3_step', '4_step', '5_step',
                                  '6_step', '7_step', '8_step', '9_step', '10_step'],
                         default='avg_n_step')
-    parser.add_argument('--exp_batch_size', type=int, default=10, help='batch size for logging expansion of policy')
     parser.add_argument('--batch_size', type=int, default=100)
     parser.add_argument('--replay_size', type=int, default=int(1e6))
     parser.add_argument('--without_delay_train', action='store_true')
 
     parser.add_argument('--log_n_step_offline_and_online_expansion', action='store_true')
     parser.add_argument('--log_n_step_online_expansion_and_boostrapping', action='store_true')
+    parser.add_argument('--exp_batch_size', type=int, default=100, help='batch size for logging expansion of policy')
 
     parser.add_argument('--exp_name', type=str, default='ddpg_n_step_new')
     parser.add_argument('--act_noise', type=float, default=0.1)
