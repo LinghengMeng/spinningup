@@ -457,14 +457,14 @@ def ddpg_n_step_new(env_name, render_env=False,
         next_obs_tmp = tf.reshape(tf.slice(x2_ph, [0, n_step_i, 0], [batch_size_ph, 1, obs_dim]),
                                   [batch_size_ph, obs_dim])
         pi_targ_tmp = act_limit * actor_targ(next_obs_tmp)
-        q_pi_targ = tf.squeeze(critic_targ(tf.concat([next_obs_tmp, pi_targ_tmp], axis=-1)), axis=1)
-        n_step_bootstrapped_q.append(q_pi_targ)
+        q_pi_targ_tmp = tf.squeeze(critic_targ(tf.concat([next_obs_tmp, pi_targ_tmp], axis=-1)), axis=1)
+        n_step_bootstrapped_q.append(q_pi_targ_tmp)
 
     # Experience buffer
     replay_buffer = ReplayBuffer(obs_dim=obs_dim, act_dim=act_dim, size=replay_size)
 
     # Bellman backup for Q function
-    dis_acc_first, dis_acc_following, dis_boots, backups = [], [], [], []
+    dis_acc_first, dis_acc_following, dis_boots, n_step_backups = [], [], [], []
     for n_step_i in range(1, n_step + 1):
         # for k = 0,..., n-1: (1-done) * gamma**(k) * reward
         dis_rate = tf.tile(tf.reshape(tf.pow(gamma, tf.range(0, n_step_i, dtype=tf.float32)), [1, -1]),
@@ -483,26 +483,35 @@ def ddpg_n_step_new(env_name, render_env=False,
         backup_tmp = tf.stop_gradient(n_step_first_rew + n_step_offline_acc_rew + boots_q)
         # Separately save for logging
         dis_acc_first.append(n_step_first_rew), dis_acc_following.append(n_step_offline_acc_rew)
-        dis_boots.append(boots_q), backups.append(backup_tmp)
+        dis_boots.append(boots_q), n_step_backups.append(backup_tmp)
 
     # Define different backup methods
-    backup_avg_n_step = tf.stop_gradient(tf.reduce_mean(tf.stack(backups, axis=1), axis=1))
-    backup_min_n_step = tf.stop_gradient(tf.reduce_min(tf.stack(backups, axis=1), axis=1))
-    backup_avg_n_step_exclude_1 = tf.stop_gradient(tf.reduce_mean(tf.stack(backups[1:], axis=1), axis=1))
+    backup_avg_n_step = tf.stop_gradient(tf.reduce_mean(tf.stack(n_step_backups, axis=1), axis=1))
+    backup_min_n_step = tf.stop_gradient(tf.reduce_min(tf.stack(n_step_backups, axis=1), axis=1))
+    backup_avg_n_step_exclude_1 = tf.stop_gradient(tf.reduce_mean(tf.stack(n_step_backups[1:], axis=1), axis=1))
+    backups = [backup_avg_n_step, backup_min_n_step, backup_avg_n_step_exclude_1] + n_step_backups
 
+    # Crucial: if statement here does not work in tensorflow
+    backup_flag = np.zeros((3 + int(n_step)))
     if backup_method == 'avg_n_step':
-        backup = backup_avg_n_step
+        backup_flag[0] = 1
     elif backup_method == 'min_n_step':
-        backup = backup_min_n_step
+        backup_flag[1] = 1
     elif backup_method == 'avg_n_step_exclude_1':
-        backup = backup_avg_n_step_exclude_1
+        backup_flag[2] = 1
     else:
         tmp_step, _ = backup_method.split('_')
         tmp_step = int(tmp_step)
         if 1 <= tmp_step and tmp_step <= n_step:
-            backup = backups[tmp_step - 1]
+            backup_flag[3 + tmp_step] = 1
         else:
             raise Exception('Wrong backup_method!')
+
+    if np.sum(backup_flag) != 1:
+        raise Exception('Wrong backup_flag!')
+
+    backup_index = np.where(backup_flag == 1)[0][0]
+    backup = backups[backup_index]
 
     # DDPG losses
     pi_loss = -tf.reduce_mean(q_pi)
@@ -636,11 +645,12 @@ def ddpg_n_step_new(env_name, render_env=False,
                                  n_step_ph: n_step,
                                  batch_size_ph: batch_size}
                     # critic update
-                    outs = sess.run([q_loss, q, backups, backup_avg_n_step, backup_min_n_step, train_q_op], feed_dict)
+                    outs = sess.run([q_loss, q, backups, train_q_op], feed_dict)
                     logger.store(LossQ=outs[0], QVals=outs[1])
+                    logger.store(QBackupAvgNStep=outs[2][0], QBackupMinNStep=outs[2][1],
+                                 QBackupAvgNStepExclude1=outs[2][2])
                     logger.store(
-                        **{'QBackup{}Step'.format(n_step_i + 1): outs[2][n_step_i] for n_step_i in range(n_step)})
-                    logger.store(QBackupAvgNStep=outs[3], QBackupMinNStep=outs[4])
+                        **{'QBackup{}Step'.format(n_step_i + 1): outs[2][3 + n_step_i] for n_step_i in range(n_step)})
                     # actor update
                     outs = sess.run([pi_loss, train_pi_op, target_update], feed_dict)
                     logger.store(LossPi=outs[0])
@@ -713,6 +723,7 @@ def ddpg_n_step_new(env_name, render_env=False,
                 logger.log_tabular('QBackup{}Step'.format(n_step_i + 1), with_min_and_max=True)
             logger.log_tabular('QBackupAvgNStep', with_min_and_max=True)
             logger.log_tabular('QBackupMinNStep', with_min_and_max=True)
+            logger.log_tabular('QBackupAvgNStepExclude1', with_min_and_max=True)
             if log_n_step_offline_and_online_expansion:
                 logger.log_tabular('PredictedQ', with_min_and_max=True)
                 logger.log_tabular('GroundTruthQ', with_min_and_max=True)
