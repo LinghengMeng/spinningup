@@ -475,7 +475,7 @@ def ddpg_n_step_new(env_name, render_env=False,
         n_step_first_rew = n_step_dis_rew[:, 0]
         # discounted following step reward
         n_step_following_rew = n_step_dis_rew[:, 1:]
-        n_step_offline_acc_rew = tf.reduce_sum(n_step_dis_rew, axis=1)
+        n_step_offline_acc_rew = tf.reduce_sum(n_step_following_rew, axis=1)
         # discounted bootstrapped reward
         boots_q = gamma ** n_step_i * (1 - tf.reshape(tf.slice(d_ph, [0, n_step_i], [batch_size_ph, 1]), [-1])) * \
                   n_step_bootstrapped_q[n_step_i - 1]
@@ -503,7 +503,7 @@ def ddpg_n_step_new(env_name, render_env=False,
         tmp_step, _ = backup_method.split('_')
         tmp_step = int(tmp_step)
         if 1 <= tmp_step and tmp_step <= n_step:
-            backup_flag[3 + tmp_step] = 1
+            backup_flag[3 + tmp_step - 1] = 1  # index start from 0
         else:
             raise Exception('Wrong backup_method!')
 
@@ -512,6 +512,7 @@ def ddpg_n_step_new(env_name, render_env=False,
 
     backup_index = np.where(backup_flag == 1)[0][0]
     backup = backups[backup_index]
+    print("backup_index={}".format(backup_index))
 
     # DDPG losses
     pi_loss = -tf.reduce_mean(q_pi)
